@@ -143,9 +143,9 @@ func processRunnerFor(servers grouper.Members) ifrit.Runner {
 
 func createEfsDriverServer(logger lager.Logger, atAddress, driversPath, mountDir string, jsonSpec bool) ifrit.Runner {
 	advertisedUrl := "http://" + atAddress
-	logger.Info("writing-spec-file", lager.Data{"location": driversPath, "name": "localdriver", "address": advertisedUrl})
+	logger.Info("writing-spec-file", lager.Data{"location": driversPath, "name": "efsdriver", "address": advertisedUrl})
 	if jsonSpec {
-		driverJsonSpec := voldriver.DriverSpec{Name: "localdriver", Address: advertisedUrl}
+		driverJsonSpec := voldriver.DriverSpec{Name: "efsdriver", Address: advertisedUrl}
 
 		if *requireSSL {
 			absCaFile, err := filepath.Abs(*caFile)
@@ -161,10 +161,10 @@ func createEfsDriverServer(logger lager.Logger, atAddress, driversPath, mountDir
 		jsonBytes, err := json.Marshal(driverJsonSpec)
 
 		exitOnFailure(logger, err)
-		err = voldriver.WriteDriverSpec(logger, driversPath, "localdriver", "json", jsonBytes)
+		err = voldriver.WriteDriverSpec(logger, driversPath, "efsdriver", "json", jsonBytes)
 		exitOnFailure(logger, err)
 	} else {
-		err := voldriver.WriteDriverSpec(logger, driversPath, "localdriver", "spec", []byte(advertisedUrl))
+		err := voldriver.WriteDriverSpec(logger, driversPath, "efsdriver", "spec", []byte(advertisedUrl))
 		exitOnFailure(logger, err)
 	}
 
@@ -194,12 +194,12 @@ func createEfsDriverUnixServer(logger lager.Logger, atAddress, driversPath, moun
 }
 
 func newLogger() (lager.Logger, *lager.ReconfigurableSink) {
-	logger, reconfigurableSink := cf_lager.New("local-driver-server")
+	logger, reconfigurableSink := cf_lager.New("efs-driver-server")
 	return logger, reconfigurableSink
 }
 
 func newUnixLogger() (lager.Logger, *lager.ReconfigurableSink) {
-	logger, reconfigurableSink := cf_lager.New("local-driver-server")
+	logger, reconfigurableSink := cf_lager.New("efs-driver-server")
 	return logger, reconfigurableSink
 }
 
