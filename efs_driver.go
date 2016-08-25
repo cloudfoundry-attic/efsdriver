@@ -51,6 +51,8 @@ func (d *EfsDriver) Create(logger lager.Logger, createRequest voldriver.CreateRe
 	logger = logger.Session("create")
 	var ok bool
 	var id interface{}
+	var config map[string]interface{}
+	var ip string
 
 	if createRequest.Name == "" {
 		return voldriver.ErrorResponse{Err: "Missing mandatory 'volume_name'"}
@@ -60,6 +62,17 @@ func (d *EfsDriver) Create(logger lager.Logger, createRequest voldriver.CreateRe
 		logger.Info("missing-volume-id", lager.Data{"volume_name": createRequest.Name})
 		return voldriver.ErrorResponse{Err: "Missing mandatory 'volume_id' field in 'Opts'"}
 	}
+
+	if config, ok = createRequest.Opts["mount_config"].(map[string]interface{}); !ok {
+		logger.Info("missing-mount-config", lager.Data{"volume_name": createRequest.Name})
+		return voldriver.ErrorResponse{Err: "Missing mandatory 'mount-config' field in 'Opts'"}
+	}
+
+	if ip, ok = config["ip"].(string); ! ok {
+		logger.Info("mount-config-missing-ip", lager.Data{"volume_name": createRequest.Name})
+		return voldriver.ErrorResponse{Err: `Missing mandatory 'ip' field in 'Opts["mount_config"]'`}
+	}
+	logger.Debug("ip address: " + ip)
 
 	var existingVolume *EfsVolumeInfo
 	if existingVolume, ok = d.volumes[createRequest.Name]; !ok {

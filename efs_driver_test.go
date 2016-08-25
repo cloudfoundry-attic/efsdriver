@@ -6,11 +6,11 @@ import (
 	"os"
 	"path"
 
+	"code.cloudfoundry.org/efsdriver"
 	"code.cloudfoundry.org/goshims/filepath/filepath_fake"
 	"code.cloudfoundry.org/goshims/os/os_fake"
 	"code.cloudfoundry.org/lager"
 	"code.cloudfoundry.org/lager/lagertest"
-	"code.cloudfoundry.org/efsdriver"
 	"code.cloudfoundry.org/voldriver"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -69,72 +69,6 @@ var _ = Describe("Efs Driver", func() {
 				getResponse := getSuccessful(logger, efsDriver, volumeName)
 				Expect(getResponse.Volume.Mountpoint).To(Equal("/path/to/mount/_mounts/test-volume-id"))
 			})
-		})
-
-		Context("when the volume has been created with a passcode", func() {
-			const volumeName = "test-volume-name"
-			const passcode = "aPassc0de"
-
-			BeforeEach(func() {
-				createSuccessful(logger, efsDriver, fakeOs, volumeName, passcode)
-			})
-
-			AfterEach(func() {
-				removeSuccessful(logger, efsDriver, volumeName)
-			})
-
-			Context("when mounting with the right passcode", func() {
-				BeforeEach(func() {
-					mountSuccessful(logger, efsDriver, volumeName, fakeFilepath, passcode)
-				})
-				AfterEach(func() {
-					unmountSuccessful(logger, efsDriver, volumeName)
-				})
-
-				It("should mount the volume on the efs filesystem", func() {
-					Expect(fakeFilepath.AbsCallCount()).To(Equal(3))
-					Expect(fakeOs.MkdirAllCallCount()).To(Equal(4))
-					Expect(fakeOs.SymlinkCallCount()).To(Equal(1))
-					from, to := fakeOs.SymlinkArgsForCall(0)
-					Expect(from).To(Equal("/path/to/mount/_volumes/test-volume-id"))
-					Expect(to).To(Equal("/path/to/mount/_mounts/test-volume-id"))
-				})
-
-				It("returns the mount point on a /VolumeDriver.Get response", func() {
-					getResponse := getSuccessful(logger, efsDriver, volumeName)
-					Expect(getResponse.Volume.Mountpoint).To(Equal("/path/to/mount/_mounts/test-volume-id"))
-				})
-			})
-
-			Context("when mounting with the wrong passcode", func() {
-				It("returns an error", func() {
-					mountResponse := efsDriver.Mount(logger, voldriver.MountRequest{
-						Name: volumeName,
-						Opts: map[string]interface{}{"passcode": "wrong"},
-					})
-					Expect(mountResponse.Err).To(Equal("Volume " + volumeName + " access denied"))
-				})
-			})
-
-			Context("when mounting with the wrong passcode type", func() {
-				It("returns an error", func() {
-					mountResponse := efsDriver.Mount(logger, voldriver.MountRequest{
-						Name: volumeName,
-						Opts: map[string]interface{}{"passcode": nil},
-					})
-					Expect(mountResponse.Err).To(Equal("Opts.passcode must be a string value"))
-				})
-			})
-
-			Context("when mounting with no passcode", func() {
-				It("returns an error", func() {
-					mountResponse := efsDriver.Mount(logger, voldriver.MountRequest{
-						Name: volumeName,
-					})
-					Expect(mountResponse.Err).To(Equal("Volume " + volumeName + " requires a passcode"))
-				})
-			})
-
 		})
 
 		Context("when the volume has not been created", func() {
@@ -265,20 +199,6 @@ var _ = Describe("Efs Driver", func() {
 			})
 		})
 
-		Context("when a passcode is wrong type", func() {
-			It("returns an error", func() {
-				createResponse := efsDriver.Create(logger, voldriver.CreateRequest{
-					Name: "volume",
-					Opts: map[string]interface{}{
-						"volume_id": "something_different_than_test",
-						"passcode":  nil,
-					},
-				})
-
-				Expect(createResponse.Err).To(Equal("Opts.passcode must be a string value"))
-			})
-		})
-
 		Context("when a second create is called with the same volume ID", func() {
 			BeforeEach(func() {
 				createSuccessful(logger, efsDriver, fakeOs, "volume", "")
@@ -295,7 +215,8 @@ var _ = Describe("Efs Driver", func() {
 					createResponse := efsDriver.Create(logger, voldriver.CreateRequest{
 						Name: "volume",
 						Opts: map[string]interface{}{
-							"volume_id": "something_different_than_test",
+							"volume_id":    "something_different_than_test",
+							"mount_config": map[string]interface{}{"ip": "1.1.1.1"},
 						},
 					})
 
@@ -476,7 +397,8 @@ func getSuccessful(logger lager.Logger, efsDriver voldriver.Driver, volumeName s
 
 func createSuccessful(logger lager.Logger, efsDriver voldriver.Driver, fakeOs *os_fake.FakeOs, volumeName string, passcode string) {
 	opts := map[string]interface{}{
-		"volume_id": "test-volume-id",
+		"volume_id":    "test-volume-id",
+		"mount_config": map[string]interface{}{"ip": "1.1.1.1"},
 	}
 	if passcode != "" {
 		opts["passcode"] = passcode
