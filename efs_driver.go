@@ -13,15 +13,13 @@ import (
 	"code.cloudfoundry.org/goshims/os"
 	"code.cloudfoundry.org/lager"
 	"code.cloudfoundry.org/voldriver"
-	"golang.org/x/crypto/bcrypt"
 )
 
 const VolumesRootDir = "_volumes"
 const MountsRootDir = "_mounts"
 
 type EfsVolumeInfo struct {
-	passcode []byte
-
+	Ip                   string
 	voldriver.VolumeInfo // see voldriver.resources.go
 }
 
@@ -30,14 +28,22 @@ type EfsDriver struct {
 	os            osshim.Os
 	filepath      filepathshim.Filepath
 	mountPathRoot string
+	mounter       Mounter
 }
 
-func NewEfsDriver(os osshim.Os, filepath filepathshim.Filepath, mountPathRoot string) *EfsDriver {
+//go:generate counterfeiter -o efsdriverfakes/fake_mounter.go . Mounter
+type Mounter interface {
+	Mount(source string, target string, fstype string, flags uintptr, data string) (err error)
+  Unmount(target string, flags int) (err error)
+}
+
+func NewEfsDriver(os osshim.Os, filepath filepathshim.Filepath, mountPathRoot string, mounter Mounter) *EfsDriver {
 	return &EfsDriver{
 		volumes:       map[string]*EfsVolumeInfo{},
 		os:            os,
 		filepath:      filepath,
 		mountPathRoot: mountPathRoot,
+		mounter:       mounter,
 	}
 }
 
@@ -68,33 +74,20 @@ func (d *EfsDriver) Create(logger lager.Logger, createRequest voldriver.CreateRe
 		return voldriver.ErrorResponse{Err: "Missing mandatory 'mount-config' field in 'Opts'"}
 	}
 
-	if ip, ok = config["ip"].(string); ! ok {
+	if ip, ok = config["ip"].(string); !ok {
 		logger.Info("mount-config-missing-ip", lager.Data{"volume_name": createRequest.Name})
 		return voldriver.ErrorResponse{Err: `Missing mandatory 'ip' field in 'Opts["mount_config"]'`}
 	}
-	logger.Debug("ip address: " + ip)
 
 	var existingVolume *EfsVolumeInfo
 	if existingVolume, ok = d.volumes[createRequest.Name]; !ok {
 		logger.Info("creating-volume", lager.Data{"volume_name": createRequest.Name, "volume_id": id.(string)})
 
-		volInfo := EfsVolumeInfo{VolumeInfo: voldriver.VolumeInfo{Name: id.(string)}}
-		if passcode, ok := createRequest.Opts["passcode"]; ok {
-			if passcodeAsString, ok := passcode.(string); !ok {
-				return voldriver.ErrorResponse{Err: "Opts.passcode must be a string value"}
-			} else {
-				passhash, err := bcrypt.GenerateFromPassword([]byte(passcodeAsString), bcrypt.DefaultCost)
-				if err != nil {
-					return voldriver.ErrorResponse{Err: "System Failure"}
-				}
-				volInfo.passcode = passhash
-			}
+		volInfo := EfsVolumeInfo{
+			VolumeInfo: voldriver.VolumeInfo{Name: id.(string)},
+			Ip:         ip,
 		}
 		d.volumes[createRequest.Name] = &volInfo
-
-		createDir := d.volumePath(logger, id.(string))
-		logger.Info("creating-volume-folder", lager.Data{"volume": createDir})
-		d.os.MkdirAll(createDir, os.ModePerm)
 
 		return voldriver.ErrorResponse{}
 	}
@@ -129,30 +122,11 @@ func (d *EfsDriver) Mount(logger lager.Logger, mountRequest voldriver.MountReque
 		return voldriver.MountResponse{Err: fmt.Sprintf("Volume '%s' must be created before being mounted", mountRequest.Name)}
 	}
 
-	if vol.passcode != nil {
-		//var hash []bytes
-		if passcode, ok := mountRequest.Opts["passcode"]; !ok {
-			logger.Info("missing-passcode", lager.Data{"volume_name": mountRequest.Name})
-			return voldriver.MountResponse{Err: "Volume " + mountRequest.Name + " requires a passcode"}
-		} else {
-			if passcodeAsString, ok := passcode.(string); !ok {
-				return voldriver.MountResponse{Err: "Opts.passcode must be a string value"}
-			} else {
-				if bcrypt.CompareHashAndPassword(vol.passcode, []byte(passcodeAsString)) != nil {
-					return voldriver.MountResponse{Err: "Volume " + mountRequest.Name + " access denied"}
-				}
-			}
-
-		}
-	}
-
-	volumePath := d.volumePath(logger, vol.Name)
-
 	mountPath := d.mountPath(logger, vol.Name)
 	logger.Info("mounting-volume", lager.Data{"id": vol.Name, "mountpoint": mountPath})
 
 	if vol.MountCount < 1 {
-		err := d.mount(logger, volumePath, mountPath)
+		err := d.mount(logger, vol.Ip, mountPath,)
 		if err != nil {
 			logger.Error("mount-volume-failed", err)
 			return voldriver.MountResponse{Err: fmt.Sprintf("Error mounting volume: %s", err.Error())}
@@ -314,9 +288,11 @@ func (d *EfsDriver) volumePath(logger lager.Logger, volumeId string) string {
 	return filepath.Join(volumesPathRoot, volumeId)
 }
 
-func (d *EfsDriver) mount(logger lager.Logger, volumePath, mountPath string) error {
-	logger.Info("link", lager.Data{"src": volumePath, "tgt": mountPath})
-	return d.os.Symlink(volumePath, mountPath)
+func (d *EfsDriver) mount(logger lager.Logger, ip, mountPath string) error {
+	logger.Info("link", lager.Data{"src": ip, "tgt": mountPath})
+
+	// TODO--permissions & flags?
+	return d.mounter.Mount(ip + ":/", mountPath, "nfs4", 0, "rw")
 }
 
 func (d *EfsDriver) unmount(logger lager.Logger, name string, mountPath string) voldriver.ErrorResponse {
@@ -342,7 +318,7 @@ func (d *EfsDriver) unmount(logger lager.Logger, name string, mountPath string) 
 		return voldriver.ErrorResponse{}
 	} else {
 		logger.Info("unmount-volume-folder", lager.Data{"mountpath": mountPath})
-		err := d.os.Remove(mountPath)
+		err := d.mounter.Unmount(mountPath, 0)
 		if err != nil {
 			logger.Error("unmount-failed", err)
 			return voldriver.ErrorResponse{Err: fmt.Sprintf("Error unmounting volume: %s", err.Error())}
