@@ -291,6 +291,12 @@ func (d *EfsDriver) volumePath(logger lager.Logger, volumeId string) string {
 func (d *EfsDriver) mount(logger lager.Logger, ip, mountPath string) error {
 	logger.Info("link", lager.Data{"src": ip, "tgt": mountPath})
 
+  err := d.os.MkdirAll(mountPath, os.ModePerm)
+	if err != nil {
+		logger.Error("create-mountdir-failed", err)
+		return err
+	}
+
 	// TODO--permissions & flags?
 	return d.mounter.Mount(ip + ":/", mountPath, "nfs4", 0, "rw")
 }
@@ -323,6 +329,12 @@ func (d *EfsDriver) unmount(logger lager.Logger, name string, mountPath string) 
 			logger.Error("unmount-failed", err)
 			return voldriver.ErrorResponse{Err: fmt.Sprintf("Error unmounting volume: %s", err.Error())}
 		}
+		err = d.os.RemoveAll(mountPath)
+		if err != nil {
+			logger.Error("create-mountdir-failed", err)
+			return voldriver.ErrorResponse{Err: fmt.Sprintf("Error creating mountpoint: %s", err.Error())}
+		}
+
 	}
 
 	logger.Info("unmounted-volume")
