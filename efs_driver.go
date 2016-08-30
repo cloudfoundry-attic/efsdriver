@@ -56,45 +56,25 @@ func (d *EfsDriver) Activate(logger lager.Logger) voldriver.ActivateResponse {
 func (d *EfsDriver) Create(logger lager.Logger, createRequest voldriver.CreateRequest) voldriver.ErrorResponse {
 	logger = logger.Session("create")
 	var ok bool
-	var id interface{}
-	var config map[string]interface{}
 	var ip string
 
 	if createRequest.Name == "" {
 		return voldriver.ErrorResponse{Err: "Missing mandatory 'volume_name'"}
 	}
 
-	if id, ok = createRequest.Opts["volume_id"]; !ok {
-		logger.Info("missing-volume-id", lager.Data{"volume_name": createRequest.Name})
-		return voldriver.ErrorResponse{Err: "Missing mandatory 'volume_id' field in 'Opts'"}
-	}
-
-	if config, ok = createRequest.Opts["mount_config"].(map[string]interface{}); !ok {
-		logger.Info("missing-mount-config", lager.Data{"volume_name": createRequest.Name})
-		return voldriver.ErrorResponse{Err: "Missing mandatory 'mount-config' field in 'Opts'"}
-	}
-
-	if ip, ok = config["ip"].(string); !ok {
+	if ip, ok = createRequest.Opts["ip"].(string); !ok {
 		logger.Info("mount-config-missing-ip", lager.Data{"volume_name": createRequest.Name})
 		return voldriver.ErrorResponse{Err: `Missing mandatory 'ip' field in 'Opts["mount_config"]'`}
 	}
 
-	var existingVolume *EfsVolumeInfo
-	if existingVolume, ok = d.volumes[createRequest.Name]; !ok {
-		logger.Info("creating-volume", lager.Data{"volume_name": createRequest.Name, "volume_id": id.(string)})
+	if _, ok = d.volumes[createRequest.Name]; !ok {
+		logger.Info("creating-volume", lager.Data{"volume_name": createRequest.Name})
 
 		volInfo := EfsVolumeInfo{
-			VolumeInfo: voldriver.VolumeInfo{Name: id.(string)},
+			VolumeInfo: voldriver.VolumeInfo{Name: createRequest.Name},
 			Ip:         ip,
 		}
 		d.volumes[createRequest.Name] = &volInfo
-
-		return voldriver.ErrorResponse{}
-	}
-
-	if existingVolume.Name != id {
-		logger.Info("duplicate-volume", lager.Data{"volume_name": createRequest.Name})
-		return voldriver.ErrorResponse{Err: fmt.Sprintf("Volume '%s' already exists with a different volume ID", createRequest.Name)}
 	}
 
 	return voldriver.ErrorResponse{}
