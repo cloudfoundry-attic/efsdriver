@@ -34,7 +34,7 @@ type EfsDriver struct {
 //go:generate counterfeiter -o efsdriverfakes/fake_mounter.go . Mounter
 type Mounter interface {
 	Mount(source string, target string, fstype string, flags uintptr, data string) (err error)
-  Unmount(target string, flags int) (err error)
+	Unmount(target string, flags int) (err error)
 }
 
 func NewEfsDriver(os osshim.Os, filepath filepathshim.Filepath, mountPathRoot string, mounter Mounter) *EfsDriver {
@@ -54,7 +54,7 @@ func (d *EfsDriver) Activate(logger lager.Logger) voldriver.ActivateResponse {
 }
 
 func (d *EfsDriver) Create(logger lager.Logger, createRequest voldriver.CreateRequest) voldriver.ErrorResponse {
-	logger = logger.Session("create")
+	logger = logger.Session("create", lager.Data{"createRequest": createRequest})
 	var ok bool
 	var id interface{}
 	var config map[string]interface{}
@@ -64,16 +64,18 @@ func (d *EfsDriver) Create(logger lager.Logger, createRequest voldriver.CreateRe
 		return voldriver.ErrorResponse{Err: "Missing mandatory 'volume_name'"}
 	}
 
-	if id, ok = createRequest.Opts["volume_id"]; !ok {
-		logger.Info("missing-volume-id", lager.Data{"volume_name": createRequest.Name})
-		return voldriver.ErrorResponse{Err: "Missing mandatory 'volume_id' field in 'Opts'"}
-	}
+	//if id, ok = createRequest.Opts["volume_id"]; !ok {
+	//	logger.Info("missing-volume-id", lager.Data{"volume_name": createRequest.Name})
+	//	return voldriver.ErrorResponse{Err: "Missing mandatory 'volume_id' field in 'Opts'"}
+	//}
+	id = createRequest.Name
 
-	if config, ok = createRequest.Opts["mount_config"].(map[string]interface{}); !ok {
-		logger.Info("missing-mount-config", lager.Data{"volume_name": createRequest.Name})
-		return voldriver.ErrorResponse{Err: "Missing mandatory 'mount-config' field in 'Opts'"}
-	}
+	//if config, ok = createRequest.Opts["mount_config"].(map[string]interface{}); !ok {
+	//	logger.Info("missing-mount-config", lager.Data{"volume_name": createRequest.Name})
+	//	return voldriver.ErrorResponse{Err: "Missing mandatory 'mount-config' field in 'Opts'"}
+	//}
 
+	config = createRequest.Opts
 	if ip, ok = config["ip"].(string); !ok {
 		logger.Info("mount-config-missing-ip", lager.Data{"volume_name": createRequest.Name})
 		return voldriver.ErrorResponse{Err: `Missing mandatory 'ip' field in 'Opts["mount_config"]'`}
@@ -123,10 +125,11 @@ func (d *EfsDriver) Mount(logger lager.Logger, mountRequest voldriver.MountReque
 	}
 
 	mountPath := d.mountPath(logger, vol.Name)
+	d.os.MkdirAll(mountPath, os.ModePerm)
 	logger.Info("mounting-volume", lager.Data{"id": vol.Name, "mountpoint": mountPath})
 
 	if vol.MountCount < 1 {
-		err := d.mount(logger, vol.Ip, mountPath,)
+		err := d.mount(logger, vol.Ip, mountPath)
 		if err != nil {
 			logger.Error("mount-volume-failed", err)
 			return voldriver.MountResponse{Err: fmt.Sprintf("Error mounting volume: %s", err.Error())}
@@ -292,7 +295,7 @@ func (d *EfsDriver) mount(logger lager.Logger, ip, mountPath string) error {
 	logger.Info("link", lager.Data{"src": ip, "tgt": mountPath})
 
 	// TODO--permissions & flags?
-	return d.mounter.Mount(ip + ":/", mountPath, "nfs4", 0, "rw")
+	return d.mounter.Mount(ip+":/", mountPath, "nfs4", 0, "rw")
 }
 
 func (d *EfsDriver) unmount(logger lager.Logger, name string, mountPath string) voldriver.ErrorResponse {
