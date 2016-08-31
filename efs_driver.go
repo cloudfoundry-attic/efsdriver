@@ -9,6 +9,8 @@ import (
 
 	"path/filepath"
 
+	"syscall"
+
 	"code.cloudfoundry.org/goshims/filepath"
 	"code.cloudfoundry.org/goshims/os"
 	"code.cloudfoundry.org/lager"
@@ -106,10 +108,19 @@ func (d *EfsDriver) Mount(logger lager.Logger, mountRequest voldriver.MountReque
 	logger.Info("mounting-volume", lager.Data{"id": vol.Name, "mountpoint": mountPath})
 
 	if vol.MountCount < 1 {
+		orig := syscall.Umask(000)
+		defer syscall.Umask(orig)
+
 		err := d.mount(logger, vol.Ip, mountPath)
 		if err != nil {
 			logger.Error("mount-volume-failed", err)
 			return voldriver.MountResponse{Err: fmt.Sprintf("Error mounting volume: %s", err.Error())}
+		}
+
+		err = d.os.Chmod(mountPath, os.ModePerm)
+		if err != nil {
+			logger.Error("volume-chmod-failed", err)
+			return voldriver.MountResponse{Err: fmt.Sprintf("Error chmoding volume: %s", err.Error())}
 		}
 		vol.Mountpoint = mountPath
 	}
@@ -280,7 +291,7 @@ func (d *EfsDriver) mount(logger lager.Logger, ip, mountPath string) error {
 	// TODO--permissions & flags?
 	output, err := d.mounter.Mount(ip+":/", mountPath, "nfs4", 0, "rw")
 	if err != nil {
-		logger.Error("mount-failed: "+ string(output), err)
+		logger.Error("mount-failed: "+string(output), err)
 	}
 	return err
 }
