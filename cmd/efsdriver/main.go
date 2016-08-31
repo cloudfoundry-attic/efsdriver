@@ -11,15 +11,15 @@ import (
 	cf_debug_server "code.cloudfoundry.org/debugserver"
 	"code.cloudfoundry.org/lager"
 
+	"code.cloudfoundry.org/efsdriver"
+	"code.cloudfoundry.org/goshims/filepath"
+	"code.cloudfoundry.org/goshims/os"
 	"code.cloudfoundry.org/voldriver"
 	"code.cloudfoundry.org/voldriver/driverhttp"
-	"code.cloudfoundry.org/efsdriver"
 	"github.com/tedsuo/ifrit"
 	"github.com/tedsuo/ifrit/grouper"
 	"github.com/tedsuo/ifrit/http_server"
 	"github.com/tedsuo/ifrit/sigmon"
-	"code.cloudfoundry.org/goshims/os"
-	"code.cloudfoundry.org/goshims/filepath"
 )
 
 var atAddress = flag.String(

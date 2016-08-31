@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"code.cloudfoundry.org/efsdriver"
+	"code.cloudfoundry.org/efsdriver/efsdriverfakes"
 	"code.cloudfoundry.org/goshims/filepath/filepath_fake"
 	"code.cloudfoundry.org/goshims/os/os_fake"
 	"code.cloudfoundry.org/lager"
@@ -13,7 +14,6 @@ import (
 	"code.cloudfoundry.org/voldriver"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"code.cloudfoundry.org/efsdriver/efsdriverfakes"
 )
 
 var _ = Describe("Efs Driver", func() {
@@ -24,7 +24,6 @@ var _ = Describe("Efs Driver", func() {
 	var efsDriver *efsdriver.EfsDriver
 	var mountDir string
 	const volumeName = "test-volume-id"
-
 
 	BeforeEach(func() {
 		logger = lagertest.NewTestLogger("efsdriver-local")
@@ -63,14 +62,14 @@ var _ = Describe("Efs Driver", func() {
 				Expect(fakeMounter.MountCallCount()).To(Equal(1))
 				from, to, fstype, _, data := fakeMounter.MountArgsForCall(0)
 				Expect(from).To(Equal("1.1.1.1:/"))
-				Expect(to).To(Equal("/path/to/mount/_mounts/"+volumeName))
+				Expect(to).To(Equal("/path/to/mount/_mounts/" + volumeName))
 				Expect(fstype).To(Equal("nfs4"))
 				Expect(data).To(Equal("rw"))
 			})
 
 			It("returns the mount point on a /VolumeDriver.Get response", func() {
 				getResponse := getSuccessful(logger, efsDriver, volumeName)
-				Expect(getResponse.Volume.Mountpoint).To(Equal("/path/to/mount/_mounts/"+volumeName))
+				Expect(getResponse.Volume.Mountpoint).To(Equal("/path/to/mount/_mounts/" + volumeName))
 			})
 		})
 
@@ -105,7 +104,7 @@ var _ = Describe("Efs Driver", func() {
 					unmountSuccessful(logger, efsDriver, volumeName)
 					Expect(fakeMounter.UnmountCallCount()).To(Equal(1))
 					removed, _ := fakeMounter.UnmountArgsForCall(0)
-					Expect(removed).To(Equal("/path/to/mount/_mounts/"+volumeName))
+					Expect(removed).To(Equal("/path/to/mount/_mounts/" + volumeName))
 				})
 
 				Context("when the same volume is mounted a second time then unmounted", func() {
@@ -233,7 +232,7 @@ var _ = Describe("Efs Driver", func() {
 					Name: volumeName,
 				})
 				Expect(pathResponse.Err).To(Equal(""))
-				Expect(pathResponse.Mountpoint).To(Equal("/path/to/mount/_mounts/"+volumeName))
+				Expect(pathResponse.Mountpoint).To(Equal("/path/to/mount/_mounts/" + volumeName))
 			})
 		})
 
@@ -382,7 +381,7 @@ func mountSuccessful(logger lager.Logger, efsDriver voldriver.Driver, volumeName
 		Opts: opts,
 	})
 	Expect(mountResponse.Err).To(Equal(""))
-	Expect(mountResponse.Mountpoint).To(Equal("/path/to/mount/_mounts/"+volumeName))
+	Expect(mountResponse.Mountpoint).To(Equal("/path/to/mount/_mounts/" + volumeName))
 }
 
 func unmountSuccessful(logger lager.Logger, efsDriver voldriver.Driver, volumeName string) {

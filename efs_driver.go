@@ -33,8 +33,8 @@ type EfsDriver struct {
 
 //go:generate counterfeiter -o efsdriverfakes/fake_mounter.go . Mounter
 type Mounter interface {
-	Mount(source string, target string, fstype string, flags uintptr, data string) (err error)
-  Unmount(target string, flags int) (err error)
+	Mount(source string, target string, fstype string, flags uintptr, data string) ([]byte, error)
+	Unmount(target string, flags int) (err error)
 }
 
 func NewEfsDriver(os osshim.Os, filepath filepathshim.Filepath, mountPathRoot string, mounter Mounter) *EfsDriver {
@@ -106,7 +106,7 @@ func (d *EfsDriver) Mount(logger lager.Logger, mountRequest voldriver.MountReque
 	logger.Info("mounting-volume", lager.Data{"id": vol.Name, "mountpoint": mountPath})
 
 	if vol.MountCount < 1 {
-		err := d.mount(logger, vol.Ip, mountPath,)
+		err := d.mount(logger, vol.Ip, mountPath)
 		if err != nil {
 			logger.Error("mount-volume-failed", err)
 			return voldriver.MountResponse{Err: fmt.Sprintf("Error mounting volume: %s", err.Error())}
@@ -269,16 +269,20 @@ func (d *EfsDriver) volumePath(logger lager.Logger, volumeId string) string {
 }
 
 func (d *EfsDriver) mount(logger lager.Logger, ip, mountPath string) error {
-	logger.Info("link", lager.Data{"src": ip, "tgt": mountPath})
+	logger.Info("mount", lager.Data{"ip": ip, "target": mountPath})
 
-  err := d.os.MkdirAll(mountPath, os.ModePerm)
+	err := d.os.MkdirAll(mountPath, os.ModePerm)
 	if err != nil {
 		logger.Error("create-mountdir-failed", err)
 		return err
 	}
 
 	// TODO--permissions & flags?
-	return d.mounter.Mount(ip + ":/", mountPath, "nfs4", 0, "rw")
+	output, err := d.mounter.Mount(ip+":/", mountPath, "nfs4", 0, "rw")
+	if err != nil {
+		logger.Error("mount-failed: "+ string(output), err)
+	}
+	return err
 }
 
 func (d *EfsDriver) unmount(logger lager.Logger, name string, mountPath string) voldriver.ErrorResponse {

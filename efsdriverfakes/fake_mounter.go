@@ -8,7 +8,7 @@ import (
 )
 
 type FakeMounter struct {
-	MountStub        func(source string, target string, fstype string, flags uintptr, data string) (err error)
+	MountStub        func(source string, target string, fstype string, flags uintptr, data string) ([]byte, error)
 	mountMutex       sync.RWMutex
 	mountArgsForCall []struct {
 		source string
@@ -18,7 +18,8 @@ type FakeMounter struct {
 		data   string
 	}
 	mountReturns struct {
-		result1 error
+		result1 []byte
+		result2 error
 	}
 	UnmountStub        func(target string, flags int) (err error)
 	unmountMutex       sync.RWMutex
@@ -31,7 +32,7 @@ type FakeMounter struct {
 	}
 }
 
-func (fake *FakeMounter) Mount(source string, target string, fstype string, flags uintptr, data string) (err error) {
+func (fake *FakeMounter) Mount(source string, target string, fstype string, flags uintptr, data string) ([]byte, error) {
 	fake.mountMutex.Lock()
 	fake.mountArgsForCall = append(fake.mountArgsForCall, struct {
 		source string
@@ -44,7 +45,7 @@ func (fake *FakeMounter) Mount(source string, target string, fstype string, flag
 	if fake.MountStub != nil {
 		return fake.MountStub(source, target, fstype, flags, data)
 	} else {
-		return fake.mountReturns.result1
+		return fake.mountReturns.result1, fake.mountReturns.result2
 	}
 }
 
@@ -60,11 +61,12 @@ func (fake *FakeMounter) MountArgsForCall(i int) (string, string, string, uintpt
 	return fake.mountArgsForCall[i].source, fake.mountArgsForCall[i].target, fake.mountArgsForCall[i].fstype, fake.mountArgsForCall[i].flags, fake.mountArgsForCall[i].data
 }
 
-func (fake *FakeMounter) MountReturns(result1 error) {
+func (fake *FakeMounter) MountReturns(result1 []byte, result2 error) {
 	fake.MountStub = nil
 	fake.mountReturns = struct {
-		result1 error
-	}{result1}
+		result1 []byte
+		result2 error
+	}{result1, result2}
 }
 
 func (fake *FakeMounter) Unmount(target string, flags int) (err error) {
