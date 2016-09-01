@@ -7,6 +7,7 @@ import (
 
 	"code.cloudfoundry.org/efsdriver"
 	"code.cloudfoundry.org/efsdriver/efsdriverfakes"
+	"code.cloudfoundry.org/efsdriver/efsvoltools"
 	"code.cloudfoundry.org/goshims/filepath/filepath_fake"
 	"code.cloudfoundry.org/goshims/os/os_fake"
 	"code.cloudfoundry.org/lager"
@@ -343,6 +344,25 @@ var _ = Describe("Efs Driver", func() {
 			})
 		})
 	})
+
+	Describe("OpenPerms", func() {
+
+		Context("when the volume has been created", func() {
+			BeforeEach(func() {
+				openPermsSuccessful(logger, efsDriver, fakeFilepath, volumeName, "")
+			})
+
+			It("should mount the volume on the efs filesystem", func() {
+				Expect(fakeFilepath.AbsCallCount()).To(Equal(1))
+				Expect(fakeMounter.MountCallCount()).To(Equal(1))
+				from, to, fstype, _, data := fakeMounter.MountArgsForCall(0)
+				Expect(from).To(Equal("1.1.1.1:/"))
+				Expect(to).To(Equal("/path/to/mount/_mounts/" + volumeName))
+				Expect(fstype).To(Equal("nfs4"))
+				Expect(data).To(Equal("rw"))
+			})
+		})
+	})
 })
 
 func getUnsuccessful(logger lager.Logger, efsDriver voldriver.Driver, volumeName string) {
@@ -396,4 +416,14 @@ func removeSuccessful(logger lager.Logger, efsDriver voldriver.Driver, volumeNam
 		Name: volumeName,
 	})
 	Expect(removeResponse.Err).To(Equal(""))
+}
+
+func openPermsSuccessful(logger lager.Logger, tools efsvoltools.VolTools, fakeFilepath *filepath_fake.FakeFilepath, volumeName string, passcode string) {
+	fakeFilepath.AbsReturns("/path/to/mount/", nil)
+	opts := map[string]interface{}{"ip": "1.1.1.1"}
+	response := tools.OpenPerms(logger, efsvoltools.OpenPermsRequest{
+		Name: volumeName,
+		Opts: opts,
+	})
+	Expect(response.Err).To(Equal(""))
 }

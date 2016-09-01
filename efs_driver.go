@@ -11,6 +11,7 @@ import (
 
 	"syscall"
 
+	"code.cloudfoundry.org/efsdriver/efsvoltools"
 	"code.cloudfoundry.org/goshims/filepath"
 	"code.cloudfoundry.org/goshims/os"
 	"code.cloudfoundry.org/lager"
@@ -66,7 +67,7 @@ func (d *EfsDriver) Create(logger lager.Logger, createRequest voldriver.CreateRe
 
 	if ip, ok = createRequest.Opts["ip"].(string); !ok {
 		logger.Info("mount-config-missing-ip", lager.Data{"volume_name": createRequest.Name})
-		return voldriver.ErrorResponse{Err: `Missing mandatory 'ip' field in 'Opts["mount_config"]'`}
+		return voldriver.ErrorResponse{Err: `Missing mandatory 'ip' field in 'Opts'`}
 	}
 
 	if _, ok = d.volumes[createRequest.Name]; !ok {
@@ -175,7 +176,7 @@ func (d *EfsDriver) Unmount(logger lager.Logger, unmountRequest voldriver.Unmoun
 		return voldriver.ErrorResponse{Err: errText}
 	}
 
-	return d.unmount(logger, unmountRequest.Name, mountPath)
+	return d.unmount(logger, unmountRequest.Name, mountPath, false)
 }
 
 func (d *EfsDriver) Remove(logger lager.Logger, removeRequest voldriver.RemoveRequest) voldriver.ErrorResponse {
@@ -196,7 +197,7 @@ func (d *EfsDriver) Remove(logger lager.Logger, removeRequest voldriver.RemoveRe
 	}
 
 	if vol.Mountpoint != "" {
-		response = d.unmount(logger, removeRequest.Name, vol.Mountpoint)
+		response = d.unmount(logger, removeRequest.Name, vol.Mountpoint, false)
 		if response.Err != "" {
 			return response
 		}
@@ -238,6 +239,46 @@ func (d *EfsDriver) Capabilities(logger lager.Logger) voldriver.CapabilitiesResp
 	return voldriver.CapabilitiesResponse{
 		Capabilities: voldriver.CapabilityInfo{Scope: "local"},
 	}
+}
+
+// efsvoltools.VolTools methods
+func (d *EfsDriver) OpenPerms(logger lager.Logger, request efsvoltools.OpenPermsRequest) efsvoltools.ErrorResponse {
+	logger = logger.Session("open-perms", lager.Data{"opts": request.Opts})
+	logger.Info("start")
+	defer logger.Info("end")
+	orig := syscall.Umask(000)
+	defer syscall.Umask(orig)
+
+	if request.Name == "" {
+		return efsvoltools.ErrorResponse{Err: "Missing mandatory 'volume_name'"}
+	}
+
+	var ip string
+	var ok bool
+	if ip, ok = request.Opts["ip"].(string); !ok {
+		logger.Info("mount-config-missing-ip", lager.Data{"volume_name": request.Name})
+		return efsvoltools.ErrorResponse{Err: `Missing mandatory 'ip' field in 'Opts'`}
+	}
+
+	mountPath := d.mountPath(logger, request.Name)
+	logger.Info("mounting-volume", lager.Data{"id": request.Name, "mountpoint": mountPath})
+
+	err := d.mount(logger, ip, mountPath)
+	if err != nil {
+		logger.Error("mount-volume-failed", err)
+		return efsvoltools.ErrorResponse{Err: fmt.Sprintf("Error mounting volume: %s", err.Error())}
+	}
+
+	err = d.os.Chmod(mountPath, os.ModePerm)
+	if err != nil {
+		logger.Error("volume-chmod-failed", err)
+		return efsvoltools.ErrorResponse{Err: fmt.Sprintf("Error chmoding volume: %s", err.Error())}
+	}
+
+	logger.Info("volume-mounted", lager.Data{"name": request.Name})
+
+	ret := d.unmount(logger, request.Name, mountPath, true)
+	return efsvoltools.ErrorResponse{Err: ret.Err}
 }
 
 func (d *EfsDriver) exists(path string) (bool, error) {
@@ -296,7 +337,7 @@ func (d *EfsDriver) mount(logger lager.Logger, ip, mountPath string) error {
 	return err
 }
 
-func (d *EfsDriver) unmount(logger lager.Logger, name string, mountPath string) voldriver.ErrorResponse {
+func (d *EfsDriver) unmount(logger lager.Logger, name string, mountPath string, ephemeral bool) voldriver.ErrorResponse {
 	logger = logger.Session("unmount")
 	logger.Info("start")
 	defer logger.Info("end")
@@ -313,11 +354,11 @@ func (d *EfsDriver) unmount(logger lager.Logger, name string, mountPath string) 
 		return voldriver.ErrorResponse{Err: errText}
 	}
 
-	d.volumes[name].MountCount--
-	if d.volumes[name].MountCount > 0 {
-		logger.Info("volume-still-in-use", lager.Data{"name": name, "count": d.volumes[name].MountCount})
-		return voldriver.ErrorResponse{}
-	} else {
+	if !ephemeral {
+		d.volumes[name].MountCount--
+	}
+
+	if ephemeral || (d.volumes[name].MountCount == 0) {
 		logger.Info("unmount-volume-folder", lager.Data{"mountpath": mountPath})
 		err := d.mounter.Unmount(mountPath, 0)
 		if err != nil {
@@ -329,12 +370,16 @@ func (d *EfsDriver) unmount(logger lager.Logger, name string, mountPath string) 
 			logger.Error("create-mountdir-failed", err)
 			return voldriver.ErrorResponse{Err: fmt.Sprintf("Error creating mountpoint: %s", err.Error())}
 		}
-
+	} else {
+		logger.Info("volume-still-in-use", lager.Data{"name": name, "count": d.volumes[name].MountCount})
+		return voldriver.ErrorResponse{}
 	}
 
 	logger.Info("unmounted-volume")
 
-	d.volumes[name].Mountpoint = ""
+	if !ephemeral {
+		d.volumes[name].Mountpoint = ""
+	}
 
 	return voldriver.ErrorResponse{}
 }
