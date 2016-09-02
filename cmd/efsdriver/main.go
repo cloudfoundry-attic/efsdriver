@@ -105,11 +105,11 @@ func main() {
 	if *transport == "tcp" {
 		logger, logTap = newLogger()
 		defer logger.Info("ends")
-		localDriverServer = createEfsDriverServer(logger, *atAddress, *driversPath, *mountDir, false, efsVolToolsAddress)
+		localDriverServer = createEfsDriverServer(logger, *atAddress, *driversPath, *mountDir, false, *efsVolToolsAddress)
 	} else if *transport == "tcp-json" {
 		logger, logTap = newLogger()
 		defer logger.Info("ends")
-		localDriverServer = createEfsDriverServer(logger, *atAddress, *driversPath, *mountDir, true, efsVolToolsAddress)
+		localDriverServer = createEfsDriverServer(logger, *atAddress, *driversPath, *mountDir, true, *efsVolToolsAddress)
 	} else {
 		logger, logTap = newUnixLogger()
 		defer logger.Info("ends")
@@ -194,7 +194,7 @@ func createEfsDriverServer(logger lager.Logger, atAddress, driversPath, mountDir
 		efsToolsHandler, err := voltoolshttp.NewHandler(logger, client)
 		exitOnFailure(logger, err)
 		efsServer := http_server.New(efsToolsAddress, efsToolsHandler)
-		server = grouper.NewParallel(os.Interrupt, grouper.Members{{"voldriver": server}, {"efstools": efsServer}})
+		server = grouper.NewParallel(os.Interrupt, grouper.Members{{"voldriver", server}, {"efstools", efsServer}})
 	}
 
 	return server
