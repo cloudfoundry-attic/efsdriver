@@ -118,11 +118,6 @@ func (d *EfsDriver) Mount(logger lager.Logger, mountRequest voldriver.MountReque
 			return voldriver.MountResponse{Err: fmt.Sprintf("Error mounting volume: %s", err.Error())}
 		}
 
-		err = d.os.Chmod(mountPath, os.ModePerm)
-		if err != nil {
-			logger.Error("volume-chmod-failed", err)
-			return voldriver.MountResponse{Err: fmt.Sprintf("Error chmoding volume: %s", err.Error())}
-		}
 		vol.Mountpoint = mountPath
 	}
 
