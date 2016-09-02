@@ -12,6 +12,7 @@ import (
 	"code.cloudfoundry.org/lager"
 
 	"code.cloudfoundry.org/efsdriver"
+	"code.cloudfoundry.org/efsdriver/efsvoltools/voltoolshttp"
 	"code.cloudfoundry.org/goshims/filepath"
 	"code.cloudfoundry.org/goshims/os"
 	"code.cloudfoundry.org/voldriver"
@@ -26,6 +27,12 @@ var atAddress = flag.String(
 	"listenAddr",
 	"0.0.0.0:9750",
 	"host:port to serve volume management functions",
+)
+
+var efsVolToolsAddress = flag.String(
+	"efsVolToolsAddr",
+	"",
+	"host:port to serve efs volume tools functions (for drivers colocated with the efs broker)",
 )
 
 var driversPath = flag.String(
@@ -98,11 +105,11 @@ func main() {
 	if *transport == "tcp" {
 		logger, logTap = newLogger()
 		defer logger.Info("ends")
-		localDriverServer = createEfsDriverServer(logger, *atAddress, *driversPath, *mountDir, false)
+		localDriverServer = createEfsDriverServer(logger, *atAddress, *driversPath, *mountDir, false, efsVolToolsAddress)
 	} else if *transport == "tcp-json" {
 		logger, logTap = newLogger()
 		defer logger.Info("ends")
-		localDriverServer = createEfsDriverServer(logger, *atAddress, *driversPath, *mountDir, true)
+		localDriverServer = createEfsDriverServer(logger, *atAddress, *driversPath, *mountDir, true, efsVolToolsAddress)
 	} else {
 		logger, logTap = newUnixLogger()
 		defer logger.Info("ends")
@@ -141,7 +148,7 @@ func processRunnerFor(servers grouper.Members) ifrit.Runner {
 	return sigmon.New(grouper.NewOrdered(os.Interrupt, servers))
 }
 
-func createEfsDriverServer(logger lager.Logger, atAddress, driversPath, mountDir string, jsonSpec bool) ifrit.Runner {
+func createEfsDriverServer(logger lager.Logger, atAddress, driversPath, mountDir string, jsonSpec bool, efsToolsAddress string) ifrit.Runner {
 	advertisedUrl := "http://" + atAddress
 	logger.Info("writing-spec-file", lager.Data{"location": driversPath, "name": "efsdriver", "address": advertisedUrl})
 	if jsonSpec {
@@ -181,6 +188,13 @@ func createEfsDriverServer(logger lager.Logger, atAddress, driversPath, mountDir
 		server = http_server.NewTLSServer(atAddress, handler, tlsConfig)
 	} else {
 		server = http_server.New(atAddress, handler)
+	}
+
+	if efsToolsAddress != "" {
+		efsToolsHandler, err := voltoolshttp.NewHandler(logger, client)
+		exitOnFailure(logger, err)
+		efsServer := http_server.New(efsToolsAddress, efsToolsHandler)
+		server = grouper.NewParallel(os.Interrupt, grouper.Members{{"voldriver": server}, {"efstools": efsServer}})
 	}
 
 	return server
