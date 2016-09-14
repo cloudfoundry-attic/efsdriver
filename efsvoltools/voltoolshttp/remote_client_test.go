@@ -10,8 +10,8 @@ import (
 
 	"code.cloudfoundry.org/efsdriver/efsvoltools"
 	"code.cloudfoundry.org/efsdriver/efsvoltools/voltoolshttp"
+	"code.cloudfoundry.org/goshims/http_wrap/http_fake"
 	"code.cloudfoundry.org/lager/lagertest"
-	"github.com/cloudfoundry/gunk/http_wrap/httpfakes"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -20,14 +20,14 @@ var _ = Describe("RemoteClient", func() {
 
 	var (
 		testLogger          = lagertest.NewTestLogger("LocalDriver Server Test")
-		httpClient          *httpfakes.FakeClient
+		httpClient          *http_fake.FakeClient
 		voltools            efsvoltools.VolTools
 		invalidHttpResponse *http.Response
 		fakeClock           *fakeclock.FakeClock
 	)
 
 	BeforeEach(func() {
-		httpClient = new(httpfakes.FakeClient)
+		httpClient = new(http_fake.FakeClient)
 		fakeClock = fakeclock.NewFakeClock(time.Now())
 		voltools = voltoolshttp.NewRemoteClientWithClient("http://127.0.0.1:8080", httpClient, fakeClock)
 	})
@@ -36,7 +36,7 @@ var _ = Describe("RemoteClient", func() {
 
 		BeforeEach(func() {
 			fakeClock = fakeclock.NewFakeClock(time.Now())
-			httpClient = new(httpfakes.FakeClient)
+			httpClient = new(http_fake.FakeClient)
 			voltools = voltoolshttp.NewRemoteClientWithClient("http://127.0.0.1:8080", httpClient, fakeClock)
 			invalidHttpResponse = &http.Response{
 				StatusCode: 500,

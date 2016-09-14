@@ -19,7 +19,7 @@ import (
 	os_http "net/http"
 
 	"code.cloudfoundry.org/efsdriver/efsvoltools"
-	"github.com/cloudfoundry/gunk/http_wrap"
+	"code.cloudfoundry.org/goshims/http_wrap"
 )
 
 type reqFactory struct {
@@ -47,14 +47,13 @@ type remoteClient struct {
 }
 
 func NewRemoteClient(url string) (*remoteClient, error) {
-	baseClient := cfhttp.NewClient()
-	httpClient := http_wrap.NewClientFrom(baseClient)
+	client := cfhttp.NewClient()
 
 	if strings.Contains(url, ".sock") {
-		httpClient = cfhttp.NewUnixClient(url)
+		client = cfhttp.NewUnixClient(url)
 		url = fmt.Sprintf("unix://%s", url)
 	}
-	return NewRemoteClientWithClient(url, httpClient, clock.NewClock()), nil
+	return NewRemoteClientWithClient(url, client, clock.NewClock()), nil
 }
 
 func NewRemoteClientWithClient(socketPath string, client http_wrap.Client, clock clock.Clock) *remoteClient {
