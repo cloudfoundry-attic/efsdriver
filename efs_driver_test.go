@@ -424,8 +424,11 @@ var _ = Describe("Efs Driver", func() {
 
 			It("Remove succeeds", func() {
 				Expect(removeResponse.Err).To(Equal(""))
-
 				getUnsuccessful(logger, efsDriver, volumeName)
+			})
+
+			It("doesn't unmount since there are not mounts", func() {
+				Expect(fakeMounter.UnmountCallCount()).To(Equal(0))
 			})
 
 			It("should write state to disk", func() {
@@ -445,9 +448,9 @@ var _ = Describe("Efs Driver", func() {
 			})
 
 			Context("when volume has been mounted", func() {
-
 				BeforeEach(func() {
 					mountSuccessful(logger, efsDriver, volumeName, fakeFilepath, "")
+					fakeMounter.UnmountReturns(nil)
 				})
 
 				It("/VolumePlugin.Remove unmounts volume", func() {
