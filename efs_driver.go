@@ -59,6 +59,8 @@ func (d *EfsDriver) Activate(logger lager.Logger) voldriver.ActivateResponse {
 
 func (d *EfsDriver) Create(logger lager.Logger, createRequest voldriver.CreateRequest) voldriver.ErrorResponse {
 	logger = logger.Session("create")
+	logger.Info("start")
+	defer logger.Info("end")
 
 	var ok bool
 	var ip string
@@ -88,7 +90,6 @@ func (d *EfsDriver) Create(logger lager.Logger, createRequest voldriver.CreateRe
 		d.volumes[createRequest.Name] = &volInfo
 
 		err := d.persist(logger, d.volumes)
-
 		if err != nil {
 			logger.Error("persist-state-failed", err)
 			return voldriver.ErrorResponse{Err: fmt.Sprintf("persist state failed when creating: %s", err.Error())}
@@ -119,7 +120,6 @@ func (d *EfsDriver) Mount(logger lager.Logger, mountRequest voldriver.MountReque
 	}
 
 	vol, err := d.getVolume(logger, mountRequest.Name)
-
 	if err != nil {
 		return voldriver.MountResponse{Err: fmt.Sprintf("Volume '%s' must be created before being mounted", mountRequest.Name)}
 	}
@@ -363,7 +363,9 @@ func (d *EfsDriver) mountPath(logger lager.Logger, volumeId string) string {
 }
 
 func (d *EfsDriver) mount(logger lager.Logger, ip, mountPath string) error {
-	logger.Info("mount", lager.Data{"ip": ip, "target": mountPath})
+	logger = logger.Session("mount", lager.Data{"ip": ip, "target": mountPath})
+	logger.Info("start")
+	defer logger.Info("end")
 
 	err := d.os.MkdirAll(mountPath, os.ModePerm)
 	if err != nil {
