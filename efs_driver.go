@@ -324,7 +324,7 @@ func (d *EfsDriver) mountPath(logger lager.Logger, volumeId string) string {
 		logger.Fatal("mkdir-rootpath-failed", err)
 	}
 
-	return filepath.Join(d.mountPathRoot, volumeId)
+	return filepath.Join(dir, volumeId)
 }
 
 func (d *EfsDriver) mount(logger lager.Logger, ip, mountPath string) error {
