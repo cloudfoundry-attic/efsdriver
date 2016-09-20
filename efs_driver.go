@@ -219,8 +219,10 @@ func (d *EfsDriver) Remove(logger lager.Logger, removeRequest voldriver.RemoveRe
 		return voldriver.ErrorResponse{fmt.Sprintf("Volume '%s' not found", removeRequest.Name)}
 	}
 
-	if err := d.unmount(logger, removeRequest.Name, vol.Mountpoint); err != nil {
-		return voldriver.ErrorResponse{Err: err.Error()}
+	if vol.Mountpoint != "" {
+		if err := d.unmount(logger, removeRequest.Name, vol.Mountpoint); err != nil {
+			return voldriver.ErrorResponse{Err: err.Error()}
+		}
 	}
 
 	logger.Info("removing-volume", lager.Data{"name": removeRequest.Name})
