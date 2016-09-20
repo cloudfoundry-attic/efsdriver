@@ -202,7 +202,7 @@ func createEfsDriverServer(logger lager.Logger, atAddress, driversPath, mountDir
 }
 
 func createEfsDriverUnixServer(logger lager.Logger, atAddress, driversPath, mountDir string) ifrit.Runner {
-	client := efsdriver.NewEfsDriver(&osshim.OsShim{}, &filepathshim.FilepathShim{}, mountDir, &efsdriver.NfsMounter{})
+	client := efsdriver.NewEfsDriver(&osshim.OsShim{}, &filepathshim.FilepathShim{}, &ioutilshim.IoutilShim{}, mountDir, &efsdriver.NfsMounter{})
 	handler, err := driverhttp.NewHandler(logger, client)
 	exitOnFailure(logger, err)
 	return http_server.NewUnixServer(atAddress, handler)
