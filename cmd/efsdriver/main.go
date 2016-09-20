@@ -14,6 +14,7 @@ import (
 	"code.cloudfoundry.org/efsdriver"
 	"code.cloudfoundry.org/efsdriver/efsvoltools/voltoolshttp"
 	"code.cloudfoundry.org/goshims/filepath"
+	"code.cloudfoundry.org/goshims/ioutil"
 	"code.cloudfoundry.org/goshims/os"
 	"code.cloudfoundry.org/voldriver"
 	"code.cloudfoundry.org/voldriver/driverhttp"
@@ -175,7 +176,7 @@ func createEfsDriverServer(logger lager.Logger, atAddress, driversPath, mountDir
 		exitOnFailure(logger, err)
 	}
 
-	client := efsdriver.NewEfsDriver(&osshim.OsShim{}, &filepathshim.FilepathShim{}, mountDir, &efsdriver.NfsMounter{})
+	client := efsdriver.NewEfsDriver(&osshim.OsShim{}, &filepathshim.FilepathShim{}, &ioutilshim.IoutilShim{}, mountDir, &efsdriver.NfsMounter{})
 	handler, err := driverhttp.NewHandler(logger, client)
 	exitOnFailure(logger, err)
 

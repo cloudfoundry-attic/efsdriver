@@ -9,6 +9,7 @@ import (
 	"code.cloudfoundry.org/efsdriver/efsdriverfakes"
 	"code.cloudfoundry.org/efsdriver/efsvoltools"
 	"code.cloudfoundry.org/goshims/filepath/filepath_fake"
+	"code.cloudfoundry.org/goshims/ioutil/ioutil_fake"
 	"code.cloudfoundry.org/goshims/os/os_fake"
 	"code.cloudfoundry.org/lager"
 	"code.cloudfoundry.org/lager/lagertest"
@@ -21,6 +22,7 @@ var _ = Describe("Efs Driver", func() {
 	var logger lager.Logger
 	var fakeOs *os_fake.FakeOs
 	var fakeFilepath *filepath_fake.FakeFilepath
+	var fakeIoutil *ioutil_fake.FakeIoutil
 	var fakeMounter *efsdriverfakes.FakeMounter
 	var efsDriver *efsdriver.EfsDriver
 	var mountDir string
@@ -33,8 +35,9 @@ var _ = Describe("Efs Driver", func() {
 
 		fakeOs = &os_fake.FakeOs{}
 		fakeFilepath = &filepath_fake.FakeFilepath{}
+		fakeIoutil = &ioutil_fake.FakeIoutil{}
 		fakeMounter = &efsdriverfakes.FakeMounter{}
-		efsDriver = efsdriver.NewEfsDriver(fakeOs, fakeFilepath, mountDir, fakeMounter)
+		efsDriver = efsdriver.NewEfsDriver(fakeOs, fakeFilepath, fakeIoutil, mountDir, fakeMounter)
 	})
 
 	Describe("#Activate", func() {
@@ -48,29 +51,69 @@ var _ = Describe("Efs Driver", func() {
 	Describe("Mount", func() {
 
 		Context("when the volume has been created", func() {
+
+			var mountResponse voldriver.MountResponse
+
 			BeforeEach(func() {
 				createSuccessful(logger, efsDriver, fakeOs, volumeName, "")
-				mountSuccessful(logger, efsDriver, volumeName, fakeFilepath, "")
+				fakeFilepath.AbsReturns("/path/to/mount/", nil)
 			})
 
-			AfterEach(func() {
-				unmountSuccessful(logger, efsDriver, volumeName)
-				removeSuccessful(logger, efsDriver, volumeName)
+			JustBeforeEach(func() {
+
+				opts := map[string]interface{}{}
+				mountResponse = efsDriver.Mount(logger, voldriver.MountRequest{
+					Name: volumeName,
+					Opts: opts,
+				})
 			})
 
 			It("should mount the volume on the efs filesystem", func() {
+				Expect(mountResponse.Err).To(Equal(""))
+				Expect(mountResponse.Mountpoint).To(Equal("/path/to/mount/" + volumeName))
+
 				Expect(fakeFilepath.AbsCallCount()).To(Equal(1))
 				Expect(fakeMounter.MountCallCount()).To(Equal(1))
 				from, to, fstype, _, data := fakeMounter.MountArgsForCall(0)
 				Expect(from).To(Equal("1.1.1.1:/"))
-				Expect(to).To(Equal("/path/to/mount/_mounts/" + volumeName))
+				Expect(to).To(Equal("/path/to/mount/" + volumeName))
 				Expect(fstype).To(Equal("nfs4"))
 				Expect(data).To(Equal("rw"))
 			})
 
+			It("should write state", func() {
+				// 1 - persist on create
+				// 2 - persist on mount
+				Expect(fakeIoutil.WriteFileCallCount()).To(Equal(2))
+			})
+
+			Context("when the file system cant be written to", func() {
+				BeforeEach(func() {
+					fakeIoutil.WriteFileReturns(errors.New("badness"))
+				})
+
+				It("returns an error in the response", func() {
+					Expect(mountResponse.Err).To(Equal("persist state failed when mounting: badness"))
+				})
+			})
+
 			It("returns the mount point on a /VolumeDriver.Get response", func() {
 				getResponse := getSuccessful(logger, efsDriver, volumeName)
-				Expect(getResponse.Volume.Mountpoint).To(Equal("/path/to/mount/_mounts/" + volumeName))
+				Expect(getResponse.Volume.Mountpoint).To(Equal("/path/to/mount/" + volumeName))
+			})
+
+			Context("when we mount the volume again", func() {
+				BeforeEach(func() {
+					mountResponse = efsDriver.Mount(logger, voldriver.MountRequest{
+						Name: volumeName,
+						Opts: map[string]interface{}{},
+					})
+				})
+
+				It("doesn't return an error", func() {
+					Expect(mountResponse.Err).To(Equal(""))
+					Expect(mountResponse.Mountpoint).To(Equal("/path/to/mount/" + volumeName))
+				})
 			})
 		})
 
@@ -91,50 +134,90 @@ var _ = Describe("Efs Driver", func() {
 			})
 
 			Context("when a volume has been mounted", func() {
+				var unmountResponse voldriver.ErrorResponse
+
 				BeforeEach(func() {
 					mountSuccessful(logger, efsDriver, volumeName, fakeFilepath, "")
 				})
 
+				JustBeforeEach(func() {
+					unmountResponse = efsDriver.Unmount(logger, voldriver.UnmountRequest{
+						Name: volumeName,
+					})
+				})
+
+				It("doesn't return an error", func() {
+					Expect(unmountResponse.Err).To(Equal(""))
+				})
+
 				It("After unmounting /VolumeDriver.Get returns no mountpoint", func() {
-					unmountSuccessful(logger, efsDriver, volumeName)
 					getResponse := getSuccessful(logger, efsDriver, volumeName)
 					Expect(getResponse.Volume.Mountpoint).To(Equal(""))
 				})
 
 				It("/VolumeDriver.Unmount unmounts", func() {
-					unmountSuccessful(logger, efsDriver, volumeName)
 					Expect(fakeMounter.UnmountCallCount()).To(Equal(1))
 					removed, _ := fakeMounter.UnmountArgsForCall(0)
-					Expect(removed).To(Equal("/path/to/mount/_mounts/" + volumeName))
+					Expect(removed).To(Equal("/path/to/mount/" + volumeName))
 				})
 
-				Context("when the same volume is mounted a second time then unmounted", func() {
+				It("writes the driver state to disk", func() {
+					// 1 - create
+					// 2 - mount
+					// 3 - unmount
+					Expect(fakeIoutil.WriteFileCallCount()).To(Equal(3))
+				})
+
+				Context("when it fails to write the driver state to disk", func() {
+					BeforeEach(func() {
+						fakeIoutil.WriteFileReturns(errors.New("badness"))
+					})
+
+					It("returns an error response", func() {
+						Expect(unmountResponse.Err).To(Equal("failed to persist state when unmounting: badness"))
+					})
+				})
+
+				Context("when the volume is mounted twice", func() {
 					BeforeEach(func() {
 						mountSuccessful(logger, efsDriver, volumeName, fakeFilepath, "")
-						unmountSuccessful(logger, efsDriver, volumeName)
+						// JustBefore each does an unmount
 					})
 
-					It("should not report empty mountpoint until unmount is called again", func() {
-						getResponse := getSuccessful(logger, efsDriver, volumeName)
-						Expect(getResponse.Volume.Mountpoint).NotTo(Equal(""))
+					It("returns no error when unmounting", func() {
+						Expect(unmountResponse.Err).To(Equal(""))
+					})
 
-						unmountSuccessful(logger, efsDriver, volumeName)
-						getResponse = getSuccessful(logger, efsDriver, volumeName)
-						Expect(getResponse.Volume.Mountpoint).To(Equal(""))
+					It("the volume should remain mounted (due to reference counting)", func() {
+						getResponse := getSuccessful(logger, efsDriver, volumeName)
+						Expect(getResponse.Volume.Mountpoint).To(Equal("/path/to/mount/" + volumeName))
+					})
+
+					Context("when unmounting again", func() {
+						BeforeEach(func() {
+							unmountResponse = efsDriver.Unmount(logger, voldriver.UnmountRequest{
+								Name: volumeName,
+							})
+						})
+
+						It("returns no error when unmounting", func() {
+							Expect(unmountResponse.Err).To(Equal(""))
+						})
+
+						It("returns no more mounts when listing", func() {
+							getResponse := getSuccessful(logger, efsDriver, volumeName)
+							Expect(getResponse.Volume.Mountpoint).To(BeEmpty())
+						})
 					})
 				})
-				Context("when the mountpath is not found on the filesystem", func() {
-					var unmountResponse voldriver.ErrorResponse
 
+				Context("when the mountpath is not found on the filesystem", func() {
 					BeforeEach(func() {
 						fakeOs.StatReturns(nil, os.ErrNotExist)
-						unmountResponse = efsDriver.Unmount(logger, voldriver.UnmountRequest{
-							Name: volumeName,
-						})
 					})
 
 					It("returns an error", func() {
-						Expect(unmountResponse.Err).To(Equal("Volume " + volumeName + " does not exist (path: /path/to/mount/_mounts/" + volumeName + "), nothing to do!"))
+						Expect(unmountResponse.Err).To(Equal("Volume " + volumeName + " does not exist (path: /path/to/mount/" + volumeName + "), nothing to do!"))
 					})
 
 					It("/VolumeDriver.Get still returns the mountpoint", func() {
@@ -144,13 +227,8 @@ var _ = Describe("Efs Driver", func() {
 				})
 
 				Context("when the mountpath cannot be accessed", func() {
-					var unmountResponse voldriver.ErrorResponse
-
 					BeforeEach(func() {
 						fakeOs.StatReturns(nil, errors.New("something weird"))
-						unmountResponse = efsDriver.Unmount(logger, voldriver.UnmountRequest{
-							Name: volumeName,
-						})
 					})
 
 					It("returns an error", func() {
@@ -187,6 +265,33 @@ var _ = Describe("Efs Driver", func() {
 	})
 
 	Describe("Create", func() {
+		Context("when create is called with a volume ID", func() {
+
+			var createResponse voldriver.ErrorResponse
+
+			JustBeforeEach(func() {
+				opts := map[string]interface{}{"ip": "1.1.1.1"}
+				createResponse = efsDriver.Create(logger, voldriver.CreateRequest{
+					Name: volumeName,
+					Opts: opts,
+				})
+			})
+
+			It("should write state", func() {
+				Expect(fakeIoutil.WriteFileCallCount()).To(Equal(1))
+			})
+
+			Context("when the file system cant be written to", func() {
+				BeforeEach(func() {
+					fakeIoutil.WriteFileReturns(errors.New("badness"))
+				})
+
+				It("returns an error in the response", func() {
+					Expect(createResponse.Err).To(Equal("persist state failed when creating: badness"))
+				})
+			})
+		})
+
 		Context("when a second create is called with the same volume ID", func() {
 			BeforeEach(func() {
 				createSuccessful(logger, efsDriver, fakeOs, "volume", "")
@@ -233,7 +338,7 @@ var _ = Describe("Efs Driver", func() {
 					Name: volumeName,
 				})
 				Expect(pathResponse.Err).To(Equal(""))
-				Expect(pathResponse.Mountpoint).To(Equal("/path/to/mount/_mounts/" + volumeName))
+				Expect(pathResponse.Mountpoint).To(Equal("/path/to/mount/" + volumeName))
 			})
 		})
 
@@ -292,6 +397,15 @@ var _ = Describe("Efs Driver", func() {
 	})
 
 	Describe("Remove", func() {
+
+		var removeResponse voldriver.ErrorResponse
+
+		JustBeforeEach(func() {
+			removeResponse = efsDriver.Remove(logger, voldriver.RemoveRequest{
+				Name: volumeName,
+			})
+		})
+
 		It("should fail if no volume name provided", func() {
 			removeResponse := efsDriver.Remove(logger, voldriver.RemoveRequest{
 				Name: "",
@@ -300,9 +414,6 @@ var _ = Describe("Efs Driver", func() {
 		})
 
 		It("should fail if no volume was created", func() {
-			removeResponse := efsDriver.Remove(logger, voldriver.RemoveRequest{
-				Name: volumeName,
-			})
 			Expect(removeResponse.Err).To(Equal("Volume '" + volumeName + "' not found"))
 		})
 
@@ -311,22 +422,35 @@ var _ = Describe("Efs Driver", func() {
 				createSuccessful(logger, efsDriver, fakeOs, volumeName, "")
 			})
 
-			It("/VolumePlugin.Remove succeeds", func() {
-				removeResponse := efsDriver.Remove(logger, voldriver.RemoveRequest{
-					Name: volumeName,
-				})
+			It("Remove succeeds", func() {
 				Expect(removeResponse.Err).To(Equal(""))
 
 				getUnsuccessful(logger, efsDriver, volumeName)
 			})
 
-			Context("when volume has been mounted", func() {
-				It("/VolumePlugin.Remove unmounts volume", func() {
-					mountSuccessful(logger, efsDriver, volumeName, fakeFilepath, "")
+			It("should write state to disk", func() {
+				// 1 create
+				// 2 remove
+				Expect(fakeIoutil.WriteFileCallCount()).To(Equal(2))
+			})
 
-					removeResponse := efsDriver.Remove(logger, voldriver.RemoveRequest{
-						Name: volumeName,
-					})
+			Context("when writing state to disk fails", func() {
+				BeforeEach(func() {
+					fakeIoutil.WriteFileReturns(errors.New("badness"))
+				})
+
+				It("should return an error response", func() {
+					Expect(removeResponse.Err).NotTo(BeEmpty())
+				})
+			})
+
+			Context("when volume has been mounted", func() {
+
+				BeforeEach(func() {
+					mountSuccessful(logger, efsDriver, volumeName, fakeFilepath, "")
+				})
+
+				It("/VolumePlugin.Remove unmounts volume", func() {
 					Expect(removeResponse.Err).To(Equal(""))
 					Expect(fakeMounter.UnmountCallCount()).To(Equal(1))
 
@@ -357,7 +481,7 @@ var _ = Describe("Efs Driver", func() {
 				Expect(fakeMounter.MountCallCount()).To(Equal(1))
 				from, to, fstype, _, data := fakeMounter.MountArgsForCall(0)
 				Expect(from).To(Equal("1.1.1.1:/"))
-				Expect(to).To(Equal("/path/to/mount/_mounts/" + volumeName))
+				Expect(to).To(Equal("/path/to/mount/" + volumeName))
 				Expect(fstype).To(Equal("nfs4"))
 				Expect(data).To(Equal("rw"))
 			})
@@ -401,21 +525,14 @@ func mountSuccessful(logger lager.Logger, efsDriver voldriver.Driver, volumeName
 		Opts: opts,
 	})
 	Expect(mountResponse.Err).To(Equal(""))
-	Expect(mountResponse.Mountpoint).To(Equal("/path/to/mount/_mounts/" + volumeName))
+	Expect(mountResponse.Mountpoint).To(Equal("/path/to/mount/" + volumeName))
 }
 
 func unmountSuccessful(logger lager.Logger, efsDriver voldriver.Driver, volumeName string) {
-	unmountResponse := efsDriver.Unmount(logger, voldriver.UnmountRequest{
+	efsDriver.Unmount(logger, voldriver.UnmountRequest{
 		Name: volumeName,
 	})
-	Expect(unmountResponse.Err).To(Equal(""))
-}
-
-func removeSuccessful(logger lager.Logger, efsDriver voldriver.Driver, volumeName string) {
-	removeResponse := efsDriver.Remove(logger, voldriver.RemoveRequest{
-		Name: volumeName,
-	})
-	Expect(removeResponse.Err).To(Equal(""))
+	//Expect(unmountResponse.Err).To(Equal(""))
 }
 
 func openPermsSuccessful(logger lager.Logger, tools efsvoltools.VolTools, fakeFilepath *filepath_fake.FakeFilepath, volumeName string, passcode string) {
