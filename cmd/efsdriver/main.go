@@ -12,6 +12,7 @@ import (
 
 	"code.cloudfoundry.org/efsdriver"
 	"code.cloudfoundry.org/efsdriver/efsvoltools/voltoolshttp"
+	"code.cloudfoundry.org/goshims/execshim"
 	"code.cloudfoundry.org/goshims/filepathshim"
 	"code.cloudfoundry.org/goshims/ioutilshim"
 	"code.cloudfoundry.org/goshims/osshim"
@@ -103,19 +104,29 @@ func main() {
 
 	var localDriverServer ifrit.Runner
 
+	client := efsdriver.NewEfsDriver(
+		logger,
+		&osshim.OsShim{},
+		&filepathshim.FilepathShim{},
+		&ioutilshim.IoutilShim{},
+		&execshim.ExecShim{},
+		*mountDir,
+		&efsdriver.NfsMounter{},
+	)
+
 	if *transport == "tcp" {
 		logger, logTap = newLogger()
 		defer logger.Info("ends")
-		localDriverServer = createEfsDriverServer(logger, *atAddress, *driversPath, *mountDir, false, *efsVolToolsAddress)
+		localDriverServer = createEfsDriverServer(logger, client, *atAddress, *driversPath, false, *efsVolToolsAddress)
 	} else if *transport == "tcp-json" {
 		logger, logTap = newLogger()
 		defer logger.Info("ends")
-		localDriverServer = createEfsDriverServer(logger, *atAddress, *driversPath, *mountDir, true, *efsVolToolsAddress)
+		localDriverServer = createEfsDriverServer(logger, client, *atAddress, *driversPath, true, *efsVolToolsAddress)
 	} else {
 		logger, logTap = newUnixLogger()
 		defer logger.Info("ends")
 
-		localDriverServer = createEfsDriverUnixServer(logger, *atAddress, *driversPath, *mountDir)
+		localDriverServer = createEfsDriverUnixServer(logger, client, *atAddress)
 	}
 
 	servers := grouper.Members{
@@ -149,7 +160,7 @@ func processRunnerFor(servers grouper.Members) ifrit.Runner {
 	return sigmon.New(grouper.NewOrdered(os.Interrupt, servers))
 }
 
-func createEfsDriverServer(logger lager.Logger, atAddress, driversPath, mountDir string, jsonSpec bool, efsToolsAddress string) ifrit.Runner {
+func createEfsDriverServer(logger lager.Logger, client *efsdriver.EfsDriver, atAddress, driversPath string, jsonSpec bool, efsToolsAddress string) ifrit.Runner {
 	advertisedUrl := "http://" + atAddress
 	logger.Info("writing-spec-file", lager.Data{"location": driversPath, "name": "efsdriver", "address": advertisedUrl})
 	if jsonSpec {
@@ -176,7 +187,6 @@ func createEfsDriverServer(logger lager.Logger, atAddress, driversPath, mountDir
 		exitOnFailure(logger, err)
 	}
 
-	client := efsdriver.NewEfsDriver(logger, &osshim.OsShim{}, &filepathshim.FilepathShim{}, &ioutilshim.IoutilShim{}, mountDir, &efsdriver.NfsMounter{})
 	handler, err := driverhttp.NewHandler(logger, client)
 	exitOnFailure(logger, err)
 
@@ -200,9 +210,7 @@ func createEfsDriverServer(logger lager.Logger, atAddress, driversPath, mountDir
 
 	return server
 }
-
-func createEfsDriverUnixServer(logger lager.Logger, atAddress, driversPath, mountDir string) ifrit.Runner {
-	client := efsdriver.NewEfsDriver(logger, &osshim.OsShim{}, &filepathshim.FilepathShim{}, &ioutilshim.IoutilShim{}, mountDir, &efsdriver.NfsMounter{})
+func createEfsDriverUnixServer(logger lager.Logger, client *efsdriver.EfsDriver, atAddress string) ifrit.Runner {
 	handler, err := driverhttp.NewHandler(logger, client)
 	exitOnFailure(logger, err)
 	return http_server.NewUnixServer(atAddress, handler)
