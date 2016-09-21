@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"os"
 
+	"encoding/json"
+
 	"code.cloudfoundry.org/efsdriver"
 	"code.cloudfoundry.org/efsdriver/efsdriverfakes"
 	"code.cloudfoundry.org/efsdriver/efsvoltools"
-	"code.cloudfoundry.org/goshims/filepath/filepath_fake"
-	"code.cloudfoundry.org/goshims/ioutil/ioutil_fake"
-	"code.cloudfoundry.org/goshims/os/os_fake"
+	"code.cloudfoundry.org/goshims/execshim/exec_fake"
+	"code.cloudfoundry.org/goshims/filepathshim/filepath_fake"
+	"code.cloudfoundry.org/goshims/ioutilshim/ioutil_fake"
+	"code.cloudfoundry.org/goshims/osshim/os_fake"
 	"code.cloudfoundry.org/lager"
 	"code.cloudfoundry.org/lager/lagertest"
 	"code.cloudfoundry.org/voldriver"
@@ -24,6 +27,8 @@ var _ = Describe("Efs Driver", func() {
 	var fakeFilepath *filepath_fake.FakeFilepath
 	var fakeIoutil *ioutil_fake.FakeIoutil
 	var fakeMounter *efsdriverfakes.FakeMounter
+	var fakeExec *exec_fake.FakeExec
+	var fakeCmd *exec_fake.FakeCmd
 	var efsDriver *efsdriver.EfsDriver
 	var mountDir string
 	const volumeName = "test-volume-id"
@@ -37,7 +42,10 @@ var _ = Describe("Efs Driver", func() {
 		fakeFilepath = &filepath_fake.FakeFilepath{}
 		fakeIoutil = &ioutil_fake.FakeIoutil{}
 		fakeMounter = &efsdriverfakes.FakeMounter{}
-		efsDriver = efsdriver.NewEfsDriver(fakeOs, fakeFilepath, fakeIoutil, mountDir, fakeMounter)
+		fakeExec = &exec_fake.FakeExec{}
+		fakeCmd = &exec_fake.FakeCmd{}
+		fakeExec.CommandReturns(fakeCmd)
+		efsDriver = efsdriver.NewEfsDriver(logger, fakeOs, fakeFilepath, fakeIoutil, fakeExec, mountDir, fakeMounter)
 	})
 
 	Describe("#Activate", func() {
@@ -487,6 +495,68 @@ var _ = Describe("Efs Driver", func() {
 				Expect(to).To(Equal("/path/to/mount/" + volumeName))
 				Expect(fstype).To(Equal("nfs4"))
 				Expect(data).To(Equal("rw"))
+			})
+		})
+	})
+
+	Describe("Restoring Internal State", func() {
+		JustBeforeEach(func() {
+			efsDriver = efsdriver.NewEfsDriver(logger, fakeOs, fakeFilepath, fakeIoutil, fakeExec, mountDir, fakeMounter)
+		})
+
+		Context("no state is persisted", func() {
+			BeforeEach(func() {
+				fakeIoutil.ReadFileReturns(nil, errors.New("file not found"))
+			})
+
+			It("returns an empty list when fetching the list of volumes", func() {
+				Expect(efsDriver.List(logger)).To(Equal(voldriver.ListResponse{}))
+			})
+		})
+
+		Context("when state is persisted", func() {
+			BeforeEach(func() {
+				data, err := json.Marshal(map[string]efsdriver.EfsVolumeInfo{
+					"some-volume-name": {
+						Ip: "123.456.789",
+						VolumeInfo: voldriver.VolumeInfo{
+							Name:       "some-volume-name",
+							Mountpoint: "/some/mount/point",
+							MountCount: 1,
+						},
+					},
+				})
+
+				Expect(err).ToNot(HaveOccurred())
+				fakeIoutil.ReadFileReturns(data, nil)
+			})
+
+			It("returns the persisted volumes when listing", func() {
+				Expect(efsDriver.List(logger)).To(Equal(voldriver.ListResponse{
+					Volumes: []voldriver.VolumeInfo{
+						{Name: "some-volume-name", Mountpoint: "/some/mount/point", MountCount: 1},
+					},
+				}))
+			})
+
+			Context("when the mounts are not present", func() {
+				BeforeEach(func() {
+					fakeCmd.StartReturns(nil)
+					fakeCmd.WaitReturns(errors.New("not a mountpoint"))
+				})
+
+				It("only returns the volumes that are present on disk", func() {
+					Expect(efsDriver.List(logger)).To(Equal(voldriver.ListResponse{}))
+				})
+			})
+
+			Context("when the state is corrupted", func() {
+				BeforeEach(func() {
+					fakeIoutil.ReadFileReturns([]byte("I have eleven toes."), nil)
+				})
+				It("will return no volumes", func() {
+					Expect(efsDriver.List(logger)).To(Equal(voldriver.ListResponse{}))
+				})
 			})
 		})
 	})

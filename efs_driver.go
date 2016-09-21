@@ -9,14 +9,16 @@ import (
 
 	"syscall"
 
-	"code.cloudfoundry.org/efsdriver/efsvoltools"
-	"code.cloudfoundry.org/goshims/filepath"
-	"code.cloudfoundry.org/goshims/ioutil"
-	"code.cloudfoundry.org/goshims/os"
-	"code.cloudfoundry.org/lager"
-	"code.cloudfoundry.org/voldriver"
 	"encoding/json"
 	"sync"
+
+	"code.cloudfoundry.org/efsdriver/efsvoltools"
+	"code.cloudfoundry.org/goshims/execshim"
+	"code.cloudfoundry.org/goshims/filepathshim"
+	"code.cloudfoundry.org/goshims/ioutilshim"
+	"code.cloudfoundry.org/goshims/osshim"
+	"code.cloudfoundry.org/lager"
+	"code.cloudfoundry.org/voldriver"
 )
 
 type EfsVolumeInfo struct {
@@ -29,6 +31,7 @@ type EfsDriver struct {
 	volumesLock   sync.RWMutex
 	os            osshim.Os
 	filepath      filepathshim.Filepath
+	exec          execshim.Exec
 	ioutil        ioutilshim.Ioutil
 	mountPathRoot string
 	mounter       Mounter
@@ -40,15 +43,21 @@ type Mounter interface {
 	Unmount(target string, flags int) (err error)
 }
 
-func NewEfsDriver(os osshim.Os, filepath filepathshim.Filepath, ioutil ioutilshim.Ioutil, mountPathRoot string, mounter Mounter) *EfsDriver {
-	return &EfsDriver{
+func NewEfsDriver(logger lager.Logger, os osshim.Os, filepath filepathshim.Filepath, ioutil ioutilshim.Ioutil, exec execshim.Exec, mountPathRoot string, mounter Mounter) *EfsDriver {
+	d := &EfsDriver{
 		volumes:       map[string]*EfsVolumeInfo{},
 		os:            os,
 		filepath:      filepath,
 		ioutil:        ioutil,
 		mountPathRoot: mountPathRoot,
 		mounter:       mounter,
+		exec:          exec,
 	}
+
+	d.restoreState(logger)
+	d.checkMounts(logger)
+
+	return d
 }
 
 func (d *EfsDriver) Activate(logger lager.Logger) voldriver.ActivateResponse {
@@ -89,7 +98,7 @@ func (d *EfsDriver) Create(logger lager.Logger, createRequest voldriver.CreateRe
 
 		d.volumes[createRequest.Name] = &volInfo
 
-		err := d.persist(logger, d.volumes)
+		err := d.persistState(logger)
 		if err != nil {
 			logger.Error("persist-state-failed", err)
 			return voldriver.ErrorResponse{Err: fmt.Sprintf("persist state failed when creating: %s", err.Error())}
@@ -147,7 +156,7 @@ func (d *EfsDriver) Mount(logger lager.Logger, mountRequest voldriver.MountReque
 
 	logger.Info("volume-mounted", lager.Data{"name": vol.Name, "count": vol.MountCount})
 
-	if err := d.persist(logger, d.volumes); err != nil {
+	if err := d.persistState(logger); err != nil {
 		logger.Error("persist-state-failed", err)
 		return voldriver.MountResponse{Err: fmt.Sprintf("persist state failed when mounting: %s", err.Error())}
 	}
@@ -221,7 +230,7 @@ func (d *EfsDriver) Unmount(logger lager.Logger, unmountRequest voldriver.Unmoun
 
 	volume.MountCount--
 
-	if err = d.persist(logger, d.volumes); err != nil {
+	if err = d.persistState(logger); err != nil {
 		return voldriver.ErrorResponse{Err: fmt.Sprintf("failed to persist state when unmounting: %s", err.Error())}
 	}
 
@@ -256,7 +265,7 @@ func (d *EfsDriver) Remove(logger lager.Logger, removeRequest voldriver.RemoveRe
 	defer d.volumesLock.Unlock()
 	delete(d.volumes, removeRequest.Name)
 
-	if err := d.persist(logger, d.volumes); err != nil {
+	if err := d.persistState(logger); err != nil {
 		return voldriver.ErrorResponse{Err: fmt.Sprintf("failed to persist state when removing: %s", err.Error())}
 	}
 
@@ -381,14 +390,16 @@ func (d *EfsDriver) mount(logger lager.Logger, ip, mountPath string) error {
 	return err
 }
 
-func (d *EfsDriver) persist(logger lager.Logger, state map[string]*EfsVolumeInfo) error {
+func (d *EfsDriver) persistState(logger lager.Logger) error {
+	// TODO--why are we passing state instead of using the one in d?
+
 	logger = logger.Session("persist-state")
 	logger.Info("start")
 	defer logger.Info("end")
 
 	stateFile := filepath.Join(d.mountPathRoot, "efs-broker-state.json")
 
-	stateData, err := json.Marshal(state)
+	stateData, err := json.Marshal(d.volumes)
 	if err != nil {
 		logger.Error("failed-to-marshall-state", err)
 		return err
@@ -402,6 +413,33 @@ func (d *EfsDriver) persist(logger lager.Logger, state map[string]*EfsVolumeInfo
 
 	logger.Debug("state-saved", lager.Data{"state-file": stateFile})
 	return nil
+}
+
+func (d *EfsDriver) restoreState(logger lager.Logger) {
+	logger = logger.Session("restore-state")
+	logger.Info("start")
+	defer logger.Info("end")
+
+	stateFile := filepath.Join(d.mountPathRoot, "efs-broker-state.json")
+
+	stateData, err := d.ioutil.ReadFile(stateFile)
+	if err != nil {
+		logger.Info(fmt.Sprintf("failed-to-read-state-file: %s", stateFile), lager.Data{"err": err})
+		return
+	}
+
+	state := map[string]*EfsVolumeInfo{}
+	err = json.Unmarshal(stateData, &state)
+
+	if err != nil {
+		logger.Error(fmt.Sprintf("failed-to-unmarshall-state from state-file: %s", stateFile), err)
+		return
+	}
+	logger.Info("state-restored", lager.Data{"state-file": stateFile})
+
+	d.volumesLock.Lock()
+	defer d.volumesLock.Unlock()
+	d.volumes = state
 }
 
 func (d *EfsDriver) unmount(logger lager.Logger, name string, mountPath string) error {
@@ -436,4 +474,21 @@ func (d *EfsDriver) unmount(logger lager.Logger, name string, mountPath string) 
 	logger.Info("unmounted-volume")
 
 	return nil
+}
+
+func (d *EfsDriver) checkMounts(logger lager.Logger) {
+	// Note: Created volumes (with no mounts) will be removed
+	//       since VolumeInfo.Mountpoint will be an empty string
+	for key, mount := range d.volumes {
+		cmd := d.exec.Command("mountpoint", "-q", mount.VolumeInfo.Mountpoint)
+
+		if err := cmd.Start(); err != nil {
+			logger.Error("unexpected-command-invocation-error", err)
+			continue
+		}
+
+		if err := cmd.Wait(); err != nil {
+			delete(d.volumes, key)
+		}
+	}
 }

@@ -14,8 +14,10 @@ import (
 	"code.cloudfoundry.org/efsdriver"
 	"code.cloudfoundry.org/efsdriver/efsvoltools/voltoolshttp"
 	"code.cloudfoundry.org/goshims/filepath"
-	"code.cloudfoundry.org/goshims/ioutil"
+	"code.cloudfoundry.org/goshims/filepathshim"
+	"code.cloudfoundry.org/goshims/ioutilshim"
 	"code.cloudfoundry.org/goshims/os"
+	"code.cloudfoundry.org/goshims/osshim"
 	"code.cloudfoundry.org/voldriver"
 	"code.cloudfoundry.org/voldriver/driverhttp"
 	"github.com/tedsuo/ifrit"
@@ -176,7 +178,7 @@ func createEfsDriverServer(logger lager.Logger, atAddress, driversPath, mountDir
 		exitOnFailure(logger, err)
 	}
 
-	client := efsdriver.NewEfsDriver(&osshim.OsShim{}, &filepathshim.FilepathShim{}, &ioutilshim.IoutilShim{}, mountDir, &efsdriver.NfsMounter{})
+	client := efsdriver.NewEfsDriver(logger, &osshim.OsShim{}, &filepathshim.FilepathShim{}, &ioutilshim.IoutilShim{}, mountDir, &efsdriver.NfsMounter{})
 	handler, err := driverhttp.NewHandler(logger, client)
 	exitOnFailure(logger, err)
 
@@ -202,7 +204,7 @@ func createEfsDriverServer(logger lager.Logger, atAddress, driversPath, mountDir
 }
 
 func createEfsDriverUnixServer(logger lager.Logger, atAddress, driversPath, mountDir string) ifrit.Runner {
-	client := efsdriver.NewEfsDriver(&osshim.OsShim{}, &filepathshim.FilepathShim{}, &ioutilshim.IoutilShim{}, mountDir, &efsdriver.NfsMounter{})
+	client := efsdriver.NewEfsDriver(logger, &osshim.OsShim{}, &filepathshim.FilepathShim{}, &ioutilshim.IoutilShim{}, mountDir, &efsdriver.NfsMounter{})
 	handler, err := driverhttp.NewHandler(logger, client)
 	exitOnFailure(logger, err)
 	return http_server.NewUnixServer(atAddress, handler)
