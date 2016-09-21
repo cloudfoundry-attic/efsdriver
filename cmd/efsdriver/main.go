@@ -99,10 +99,11 @@ var insecureSkipVerify = flag.Bool(
 func main() {
 	parseCommandLine()
 
-	var logger lager.Logger
-	var logTap *lager.ReconfigurableSink
-
 	var localDriverServer ifrit.Runner
+
+	logger, logTap := newLogger()
+	logger.Info("start")
+	defer logger.Info("end")
 
 	client := efsdriver.NewEfsDriver(
 		logger,
@@ -115,30 +116,24 @@ func main() {
 	)
 
 	if *transport == "tcp" {
-		logger, logTap = newLogger()
-		defer logger.Info("ends")
 		localDriverServer = createEfsDriverServer(logger, client, *atAddress, *driversPath, false, *efsVolToolsAddress)
 	} else if *transport == "tcp-json" {
-		logger, logTap = newLogger()
-		defer logger.Info("ends")
 		localDriverServer = createEfsDriverServer(logger, client, *atAddress, *driversPath, true, *efsVolToolsAddress)
 	} else {
-		logger, logTap = newUnixLogger()
-		defer logger.Info("ends")
-
 		localDriverServer = createEfsDriverUnixServer(logger, client, *atAddress)
 	}
 
 	servers := grouper.Members{
 		{"localdriver-server", localDriverServer},
 	}
+
 	if dbgAddr := cf_debug_server.DebugAddress(flag.CommandLine); dbgAddr != "" {
 		servers = append(grouper.Members{
 			{"debug-server", cf_debug_server.Runner(dbgAddr, logTap)},
 		}, servers...)
 	}
-	process := ifrit.Invoke(processRunnerFor(servers))
 
+	process := ifrit.Invoke(processRunnerFor(servers))
 	logger.Info("started")
 
 	untilTerminated(logger, process)
@@ -217,11 +212,6 @@ func createEfsDriverUnixServer(logger lager.Logger, client *efsdriver.EfsDriver,
 }
 
 func newLogger() (lager.Logger, *lager.ReconfigurableSink) {
-	logger, reconfigurableSink := cf_lager.New("efs-driver-server")
-	return logger, reconfigurableSink
-}
-
-func newUnixLogger() (lager.Logger, *lager.ReconfigurableSink) {
 	logger, reconfigurableSink := cf_lager.New("efs-driver-server")
 	return logger, reconfigurableSink
 }
