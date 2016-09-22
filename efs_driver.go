@@ -208,30 +208,26 @@ func (d *EfsDriver) Unmount(logger lager.Logger, unmountRequest voldriver.Unmoun
 		return voldriver.ErrorResponse{Err: errText}
 	}
 
-	unmounted := false
-
 	if vol.MountCount == 1 {
 		if err := d.unmount(logger, unmountRequest.Name, vol.Mountpoint); err != nil {
 			return voldriver.ErrorResponse{Err: err.Error()}
 		}
-
-		unmounted = true
 	}
 
 	d.volumesLock.Lock()
 	defer d.volumesLock.Unlock()
 
 	// The previous vol could be stale (since it's a value copy)
-	volume := d.volumes[unmountRequest.Name]
+	if volume, ok := d.volumes[unmountRequest.Name]; ok {
+		volume.MountCount--
 
-	if unmounted {
-		volume.Mountpoint = ""
-	}
+		if volume.MountCount < 1 {
+			delete(d.volumes, unmountRequest.Name)
+		}
 
-	volume.MountCount--
-
-	if err = d.persistState(logger); err != nil {
-		return voldriver.ErrorResponse{Err: fmt.Sprintf("failed to persist state when unmounting: %s", err.Error())}
+		if err = d.persistState(logger); err != nil {
+			return voldriver.ErrorResponse{Err: fmt.Sprintf("failed to persist state when unmounting: %s", err.Error())}
+		}
 	}
 
 	return voldriver.ErrorResponse{}
@@ -250,7 +246,7 @@ func (d *EfsDriver) Remove(logger lager.Logger, removeRequest voldriver.RemoveRe
 
 	if err != nil {
 		logger.Error("failed-volume-removal", fmt.Errorf(fmt.Sprintf("Volume %s not found", removeRequest.Name)))
-		return voldriver.ErrorResponse{fmt.Sprintf("Volume '%s' not found", removeRequest.Name)}
+		return voldriver.ErrorResponse{Err: fmt.Sprintf("Volume '%s' not found", removeRequest.Name)}
 	}
 
 	if vol.Mountpoint != "" {
@@ -344,6 +340,7 @@ func (d *EfsDriver) OpenPerms(logger lager.Logger, request efsvoltools.OpenPerms
 		return efsvoltools.ErrorResponse{Err: err.Error()}
 	}
 
+	// TODO - delete mount folder
 	return efsvoltools.ErrorResponse{}
 }
 

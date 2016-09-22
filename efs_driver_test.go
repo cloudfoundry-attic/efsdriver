@@ -158,9 +158,12 @@ var _ = Describe("Efs Driver", func() {
 					Expect(unmountResponse.Err).To(Equal(""))
 				})
 
-				It("After unmounting /VolumeDriver.Get returns no mountpoint", func() {
-					getResponse := getSuccessful(logger, efsDriver, volumeName)
-					Expect(getResponse.Volume.Mountpoint).To(Equal(""))
+				It("After unmounting /VolumeDriver.Get returns no volume", func() {
+					getResponse := efsDriver.Get(logger, voldriver.GetRequest{
+						Name: volumeName,
+					})
+
+					Expect(getResponse.Err).To(Equal("Volume not found"))
 				})
 
 				It("/VolumeDriver.Unmount unmounts", func() {
@@ -212,9 +215,12 @@ var _ = Describe("Efs Driver", func() {
 							Expect(unmountResponse.Err).To(Equal(""))
 						})
 
-						It("returns no more mounts when listing", func() {
-							getResponse := getSuccessful(logger, efsDriver, volumeName)
-							Expect(getResponse.Volume.Mountpoint).To(BeEmpty())
+						It("deleted the volume", func() {
+							getResponse := efsDriver.Get(logger, voldriver.GetRequest{
+								Name: volumeName,
+							})
+
+							Expect(getResponse.Err).To(Equal("Volume not found"))
 						})
 					})
 				})
