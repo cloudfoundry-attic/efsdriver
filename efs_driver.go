@@ -113,7 +113,10 @@ func (d *EfsDriver) List(logger lager.Logger) voldriver.ListResponse {
 	d.volumesLock.RLock()
 	defer d.volumesLock.RUnlock()
 
-	listResponse := voldriver.ListResponse{}
+	listResponse := voldriver.ListResponse{
+		Volumes: []voldriver.VolumeInfo{},
+	}
+
 	for _, volume := range d.volumes {
 		listResponse.Volumes = append(listResponse.Volumes, volume.VolumeInfo)
 	}

@@ -516,7 +516,9 @@ var _ = Describe("Efs Driver", func() {
 			})
 
 			It("returns an empty list when fetching the list of volumes", func() {
-				Expect(efsDriver.List(logger)).To(Equal(voldriver.ListResponse{}))
+				Expect(efsDriver.List(logger)).To(Equal(voldriver.ListResponse{
+					Volumes: []voldriver.VolumeInfo{},
+				}))
 			})
 		})
 
@@ -552,7 +554,9 @@ var _ = Describe("Efs Driver", func() {
 				})
 
 				It("only returns the volumes that are present on disk", func() {
-					Expect(efsDriver.List(logger)).To(Equal(voldriver.ListResponse{}))
+					Expect(efsDriver.List(logger)).To(Equal(voldriver.ListResponse{
+						Volumes: []voldriver.VolumeInfo{},
+					}))
 				})
 			})
 
@@ -561,7 +565,9 @@ var _ = Describe("Efs Driver", func() {
 					fakeIoutil.ReadFileReturns([]byte("I have eleven toes."), nil)
 				})
 				It("will return no volumes", func() {
-					Expect(efsDriver.List(logger)).To(Equal(voldriver.ListResponse{}))
+					Expect(efsDriver.List(logger)).To(Equal(voldriver.ListResponse{
+						Volumes: []voldriver.VolumeInfo{},
+					}))
 				})
 			})
 		})
