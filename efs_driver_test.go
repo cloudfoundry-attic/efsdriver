@@ -420,15 +420,15 @@ var _ = Describe("Efs Driver", func() {
 			})
 		})
 
-		It("should fail if no volume name provided", func() {
+		It("fails if no volume name provided", func() {
 			removeResponse := efsDriver.Remove(logger, voldriver.RemoveRequest{
 				Name: "",
 			})
 			Expect(removeResponse.Err).To(Equal("Missing mandatory 'volume_name'"))
 		})
 
-		It("should fail if no volume was created", func() {
-			Expect(removeResponse.Err).To(Equal("Volume '" + volumeName + "' not found"))
+		It("returns no error if the volume is not found", func() {
+			Expect(removeResponse.Err).To(BeEmpty())
 		})
 
 		Context("when the volume has been created", func() {
@@ -477,11 +477,11 @@ var _ = Describe("Efs Driver", func() {
 		})
 
 		Context("when the volume has not been created", func() {
-			It("returns an error", func() {
+			It("doesn't return an error", func() {
 				removeResponse := efsDriver.Remove(logger, voldriver.RemoveRequest{
 					Name: volumeName,
 				})
-				Expect(removeResponse.Err).To(Equal("Volume '" + volumeName + "' not found"))
+				Expect(removeResponse.Err).To(BeEmpty())
 			})
 		})
 	})
