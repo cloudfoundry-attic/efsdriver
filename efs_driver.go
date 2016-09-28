@@ -12,6 +12,9 @@ import (
 	"encoding/json"
 	"sync"
 
+	"context"
+	"time"
+
 	"code.cloudfoundry.org/efsdriver/efsvoltools"
 	"code.cloudfoundry.org/goshims/execshim"
 	"code.cloudfoundry.org/goshims/filepathshim"
@@ -480,7 +483,8 @@ func (d *EfsDriver) checkMounts(logger lager.Logger) {
 	// Note: Created volumes (with no mounts) will be removed
 	//       since VolumeInfo.Mountpoint will be an empty string
 	for key, mount := range d.volumes {
-		cmd := d.exec.Command("mountpoint", "-q", mount.VolumeInfo.Mountpoint)
+		ctx, _ := context.WithDeadline(context.TODO(), time.Now().Add(time.Second*5))
+		cmd := d.exec.CommandContext(ctx, "mountpoint", "-q", mount.VolumeInfo.Mountpoint)
 
 		if err := cmd.Start(); err != nil {
 			logger.Error("unexpected-command-invocation-error", err)
@@ -488,7 +492,9 @@ func (d *EfsDriver) checkMounts(logger lager.Logger) {
 		}
 
 		if err := cmd.Wait(); err != nil {
+			logger.Info(fmt.Sprintf("unable to verify volume %s (%s)", key, err.Error()))
 			delete(d.volumes, key)
 		}
 	}
+
 }
