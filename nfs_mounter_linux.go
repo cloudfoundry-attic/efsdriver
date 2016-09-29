@@ -2,7 +2,6 @@ package efsdriver
 
 import (
 	"os/exec"
-	"syscall"
 )
 
 type NfsMounter struct{}
