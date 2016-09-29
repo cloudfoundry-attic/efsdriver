@@ -129,6 +129,8 @@ func (d *EfsDriver) List(logger lager.Logger) voldriver.ListResponse {
 
 func (d *EfsDriver) Mount(logger lager.Logger, mountRequest voldriver.MountRequest) voldriver.MountResponse {
 	logger = logger.Session("mount", lager.Data{"volume": mountRequest.Name})
+	logger.Info("start")
+	defer logger.Info("end")
 
 	if mountRequest.Name == "" {
 		return voldriver.MountResponse{Err: "Missing mandatory 'volume_name'"}
@@ -143,9 +145,6 @@ func (d *EfsDriver) Mount(logger lager.Logger, mountRequest voldriver.MountReque
 	logger.Info("mounting-volume", lager.Data{"id": vol.Name, "mountpoint": mountPath})
 
 	if vol.MountCount < 1 {
-		orig := syscall.Umask(000)
-		defer syscall.Umask(orig)
-
 		if err := d.mount(logger, vol.Ip, mountPath); err != nil {
 			logger.Error("mount-volume-failed", err)
 			return voldriver.MountResponse{Err: fmt.Sprintf("Error mounting volume: %s", err.Error())}
@@ -362,6 +361,9 @@ func (d *EfsDriver) exists(path string) (bool, error) {
 }
 
 func (d *EfsDriver) mountPath(logger lager.Logger, volumeId string) string {
+	orig := syscall.Umask(000)
+	defer syscall.Umask(orig)
+
 	dir, err := d.filepath.Abs(d.mountPathRoot)
 	if err != nil {
 		logger.Fatal("abs-failed", err)
@@ -378,6 +380,9 @@ func (d *EfsDriver) mount(logger lager.Logger, ip, mountPath string) error {
 	logger = logger.Session("mount", lager.Data{"ip": ip, "target": mountPath})
 	logger.Info("start")
 	defer logger.Info("end")
+
+	orig := syscall.Umask(000)
+	defer syscall.Umask(orig)
 
 	err := d.os.MkdirAll(mountPath, os.ModePerm)
 	if err != nil {
@@ -399,6 +404,9 @@ func (d *EfsDriver) persistState(logger lager.Logger) error {
 	logger = logger.Session("persist-state")
 	logger.Info("start")
 	defer logger.Info("end")
+
+	orig := syscall.Umask(000)
+	defer syscall.Umask(orig)
 
 	stateFile := filepath.Join(d.mountPathRoot, "efs-broker-state.json")
 
@@ -480,6 +488,10 @@ func (d *EfsDriver) unmount(logger lager.Logger, name string, mountPath string) 
 }
 
 func (d *EfsDriver) checkMounts(logger lager.Logger) {
+	logger = logger.Session("check-mounts")
+	logger.Info("start")
+	defer logger.Info("end")
+
 	// Note: Created volumes (with no mounts) will be removed
 	//       since VolumeInfo.Mountpoint will be an empty string
 	for key, mount := range d.volumes {
