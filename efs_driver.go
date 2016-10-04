@@ -38,6 +38,7 @@ type EfsDriver struct {
 	ioutil        ioutilshim.Ioutil
 	mountPathRoot string
 	mounter       Mounter
+	operationLock sync.Mutex
 }
 
 //go:generate counterfeiter -o efsdriverfakes/fake_mounter.go . Mounter
@@ -391,7 +392,9 @@ func (d *EfsDriver) mount(logger lager.Logger, ip, mountPath string) error {
 	}
 
 	// TODO--permissions & flags?
-	output, err := d.mounter.Mount(ip+":/", mountPath, "nfs4", 0, "rw")
+	d.operationLock.Lock()
+	defer d.operationLock.Unlock()
+	output, err := d.mounter.Mount(ip+":/", mountPath, "nfs4", 0, "vers=4.1")
 	if err != nil {
 		logger.Error("mount-failed: "+string(output), err)
 	}
@@ -471,6 +474,9 @@ func (d *EfsDriver) unmount(logger lager.Logger, name string, mountPath string) 
 	}
 
 	logger.Info("unmount-volume-folder", lager.Data{"mountpath": mountPath})
+
+	d.operationLock.Lock()
+	defer d.operationLock.Unlock()
 	err = d.mounter.Unmount(mountPath, 0)
 	if err != nil {
 		logger.Error("unmount-failed", err)
@@ -492,8 +498,6 @@ func (d *EfsDriver) checkMounts(logger lager.Logger) {
 	logger.Info("start")
 	defer logger.Info("end")
 
-	// Note: Created volumes (with no mounts) will be removed
-	//       since VolumeInfo.Mountpoint will be an empty string
 	for key, mount := range d.volumes {
 		ctx, _ := context.WithDeadline(context.TODO(), time.Now().Add(time.Second*5))
 		cmd := d.exec.CommandContext(ctx, "mountpoint", "-q", mount.VolumeInfo.Mountpoint)
@@ -504,6 +508,8 @@ func (d *EfsDriver) checkMounts(logger lager.Logger) {
 		}
 
 		if err := cmd.Wait(); err != nil {
+			// Note: Created volumes (with no mounts) will be removed
+			//       since VolumeInfo.Mountpoint will be an empty string
 			logger.Info(fmt.Sprintf("unable to verify volume %s (%s)", key, err.Error()))
 			delete(d.volumes, key)
 		}

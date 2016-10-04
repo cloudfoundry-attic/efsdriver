@@ -108,7 +108,7 @@ var _ = Describe("Efs Driver", func() {
 					Expect(from).To(Equal("1.1.1.1:/"))
 					Expect(to).To(Equal("/path/to/mount/" + volumeName))
 					Expect(fstype).To(Equal("nfs4"))
-					Expect(data).To(Equal("rw"))
+					Expect(data).To(ContainSubstring("vers=4.1"))
 				})
 
 				It("should write state", func() {
@@ -522,7 +522,7 @@ var _ = Describe("Efs Driver", func() {
 					Expect(from).To(Equal("1.1.1.1:/"))
 					Expect(to).To(Equal("/path/to/mount/" + volumeName))
 					Expect(fstype).To(Equal("nfs4"))
-					Expect(data).To(Equal("rw"))
+					Expect(data).To(Equal("vers=4.1"))
 				})
 			})
 		})
