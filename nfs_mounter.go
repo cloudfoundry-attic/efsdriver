@@ -1,12 +1,8 @@
 package efsdriver
 
 import (
-	"context"
-
 	"code.cloudfoundry.org/goshims/execshim"
 )
-
-type serialOperation func(ctx context.Context)
 
 type nfsMounter struct {
 	exec execshim.Exec
