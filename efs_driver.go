@@ -24,6 +24,8 @@ import (
 	"code.cloudfoundry.org/voldriver"
 )
 
+const mountOptions = "vers=4.1,rsize=1048576,wsize=1048576,hard,intr,timeo=600,retrans=2,actimeo=0"
+
 type EfsVolumeInfo struct {
 	Ip                   string
 	voldriver.VolumeInfo // see voldriver.resources.go
@@ -394,7 +396,7 @@ func (d *EfsDriver) mount(logger lager.Logger, ip, mountPath string) error {
 	// TODO--permissions & flags?
 	d.operationLock.Lock()
 	defer d.operationLock.Unlock()
-	output, err := d.mounter.Mount(ip+":/", mountPath, "nfs4", 0, "vers=4.1")
+	output, err := d.mounter.Mount(ip+":/", mountPath, "nfs4", 0, mountOptions)
 	if err != nil {
 		logger.Error("mount-failed: "+string(output), err)
 		err = fmt.Errorf("%s:(%s)", output, err.Error())
