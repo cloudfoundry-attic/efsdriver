@@ -397,6 +397,7 @@ func (d *EfsDriver) mount(logger lager.Logger, ip, mountPath string) error {
 	output, err := d.mounter.Mount(ip+":/", mountPath, "nfs4", 0, "vers=4.1")
 	if err != nil {
 		logger.Error("mount-failed: "+string(output), err)
+		err = fmt.Errorf("%s:(%s)", output, err.Error())
 	}
 	return err
 }
