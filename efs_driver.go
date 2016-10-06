@@ -40,7 +40,6 @@ type EfsDriver struct {
 	ioutil        ioutilshim.Ioutil
 	mountPathRoot string
 	mounter       Mounter
-	operationLock sync.Mutex
 }
 
 //go:generate counterfeiter -o efsdriverfakes/fake_mounter.go . Mounter
@@ -394,8 +393,6 @@ func (d *EfsDriver) mount(logger lager.Logger, ip, mountPath string) error {
 	}
 
 	// TODO--permissions & flags?
-	d.operationLock.Lock()
-	defer d.operationLock.Unlock()
 	output, err := d.mounter.Mount(ip+":/", mountPath, "nfs4", 0, mountOptions)
 	if err != nil {
 		logger.Error("mount-failed: "+string(output), err)
@@ -478,8 +475,6 @@ func (d *EfsDriver) unmount(logger lager.Logger, name string, mountPath string) 
 
 	logger.Info("unmount-volume-folder", lager.Data{"mountpath": mountPath})
 
-	d.operationLock.Lock()
-	defer d.operationLock.Unlock()
 	err = d.mounter.Unmount(mountPath, 0)
 	if err != nil {
 		logger.Error("unmount-failed", err)
