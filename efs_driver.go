@@ -24,7 +24,7 @@ import (
 	"code.cloudfoundry.org/voldriver"
 )
 
-const mountOptions = "vers=4.1,rsize=1048576,wsize=1048576,hard,intr,timeo=600,retrans=2,actimeo=0"
+const mountOptions = "vers=4.0,rsize=1048576,wsize=1048576,hard,intr,timeo=600,retrans=2,actimeo=0"
 
 type EfsVolumeInfo struct {
 	Ip                   string
