@@ -20,6 +20,8 @@ import (
 
 	"code.cloudfoundry.org/efsdriver/efsvoltools"
 	"code.cloudfoundry.org/goshims/http_wrap"
+	"code.cloudfoundry.org/voldriver"
+	"code.cloudfoundry.org/voldriver/driverhttp"
 )
 
 type reqFactory struct {
@@ -64,8 +66,8 @@ func NewRemoteClientWithClient(socketPath string, client http_wrap.Client, clock
 	}
 }
 
-func (r *remoteClient) OpenPerms(logger lager.Logger, request efsvoltools.OpenPermsRequest) efsvoltools.ErrorResponse {
-	logger = logger.Session("open-perms", lager.Data{"request": request})
+func (r *remoteClient) OpenPerms(env voldriver.Env, request efsvoltools.OpenPermsRequest) efsvoltools.ErrorResponse {
+	logger := (*env.Logger()).Session("open-perms", lager.Data{"request": request})
 	logger.Info("start")
 	defer logger.Info("end")
 
@@ -77,7 +79,7 @@ func (r *remoteClient) OpenPerms(logger lager.Logger, request efsvoltools.OpenPe
 
 	httpRequest := newReqFactory(r.reqGen, efsvoltools.OpenPermsRoute, payload)
 
-	response, err := r.do(logger, httpRequest)
+	response, err := r.do(driverhttp.EnvWithLogger(&logger, env), httpRequest)
 	if err != nil {
 		logger.Error("failed-creating-volume", err)
 		return efsvoltools.ErrorResponse{Err: err.Error()}
@@ -110,12 +112,14 @@ func (r *remoteClient) clientError(logger lager.Logger, err error, msg string) s
 	return err.Error()
 }
 
-func (r *remoteClient) do(logger lager.Logger, requestFactory *reqFactory) (*os_http.Response, error) {
+func (r *remoteClient) do(env voldriver.Env, requestFactory *reqFactory) (*os_http.Response, error) {
 	var (
 		response *os_http.Response
 		err      error
 		request  *os_http.Request
 	)
+
+	logger := (*env.Logger()).Session("do")
 
 	request, err = requestFactory.Request()
 	if err != nil {

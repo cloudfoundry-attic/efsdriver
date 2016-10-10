@@ -9,6 +9,7 @@ import (
 	"code.cloudfoundry.org/efsdriver/efsvoltools"
 	"code.cloudfoundry.org/lager"
 	"github.com/tedsuo/rata"
+	"code.cloudfoundry.org/voldriver/driverhttp"
 )
 
 func NewHandler(logger lager.Logger, client efsvoltools.VolTools) (http.Handler, error) {
@@ -42,8 +43,10 @@ func newOpenPermsHandler(logger lager.Logger, client efsvoltools.VolTools) http.
 			cf_http_handlers.WriteJSONResponse(w, http.StatusBadRequest, efsvoltools.ErrorResponse{Err: err.Error()})
 			return
 		}
+		ctx := req.Context()
+		env := driverhttp.NewHttpDriverEnv(&logger, &ctx)
 
-		openPermsResponse := client.OpenPerms(logger, request)
+		openPermsResponse := client.OpenPerms(env, request)
 		if openPermsResponse.Err != "" {
 			logger.Error("failed-modifying-permissions", err, lager.Data{"volume": request.Name})
 			cf_http_handlers.WriteJSONResponse(w, http.StatusInternalServerError, openPermsResponse)

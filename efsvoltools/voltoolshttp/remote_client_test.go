@@ -8,10 +8,15 @@ import (
 
 	"bytes"
 
+	"context"
+
 	"code.cloudfoundry.org/efsdriver/efsvoltools"
 	"code.cloudfoundry.org/efsdriver/efsvoltools/voltoolshttp"
 	"code.cloudfoundry.org/goshims/http_wrap/http_fake"
+	"code.cloudfoundry.org/lager"
 	"code.cloudfoundry.org/lager/lagertest"
+	"code.cloudfoundry.org/voldriver"
+	"code.cloudfoundry.org/voldriver/driverhttp"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -19,7 +24,9 @@ import (
 var _ = Describe("RemoteClient", func() {
 
 	var (
-		testLogger          = lagertest.NewTestLogger("LocalDriver Server Test")
+		testLogger          lager.Logger
+		testCtx             context.Context
+		testEnv             voldriver.Env
 		httpClient          *http_fake.FakeClient
 		voltools            efsvoltools.VolTools
 		invalidHttpResponse *http.Response
@@ -27,6 +34,10 @@ var _ = Describe("RemoteClient", func() {
 	)
 
 	BeforeEach(func() {
+		testLogger = lagertest.NewTestLogger("LocalDriver Server Test")
+		testCtx = context.TODO()
+		testEnv = driverhttp.NewHttpDriverEnv(&testLogger, &testCtx)
+
 		httpClient = new(http_fake.FakeClient)
 		fakeClock = fakeclock.NewFakeClock(time.Now())
 		voltools = voltoolshttp.NewRemoteClientWithClient("http://127.0.0.1:8080", httpClient, fakeClock)
@@ -47,7 +58,7 @@ var _ = Describe("RemoteClient", func() {
 		It("should not be able to open up permissions", func() {
 			httpClient.DoReturns(invalidHttpResponse, nil)
 
-			response := voltools.OpenPerms(testLogger, efsvoltools.OpenPermsRequest{})
+			response := voltools.OpenPerms(testEnv, efsvoltools.OpenPermsRequest{})
 
 			By("signaling an error")
 			Expect(response.Err).To(Equal("some error string"))
@@ -62,7 +73,7 @@ var _ = Describe("RemoteClient", func() {
 			}
 			httpClient.DoReturns(resp, nil)
 
-			response := voltools.OpenPerms(testLogger, efsvoltools.OpenPermsRequest{})
+			response := voltools.OpenPerms(testEnv, efsvoltools.OpenPermsRequest{})
 
 			By("giving back no error")
 			Expect(response.Err).To(Equal(""))
