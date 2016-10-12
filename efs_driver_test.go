@@ -109,10 +109,11 @@ var _ = Describe("Efs Driver", func() {
 
 					Expect(fakeFilepath.AbsCallCount()).To(Equal(1))
 					Expect(fakeMounter.MountCallCount()).To(Equal(1))
-					from, to, fstype, _, _ := fakeMounter.MountArgsForCall(0)
-					Expect(from).To(Equal("1.1.1.1:/"))
+					from, to, fstype, _, args := fakeMounter.MountArgsForCall(0)
+					Expect(from).To(Equal(":/"))
 					Expect(to).To(Equal("/path/to/mount/" + volumeName))
 					Expect(fstype).To(Equal("nfs4"))
+					Expect(args).To(ContainSubstring("1.1.1.1"))
 				})
 
 				It("should write state", func() {
@@ -522,10 +523,11 @@ var _ = Describe("Efs Driver", func() {
 				It("should mount the volume on the efs filesystem", func() {
 					Expect(fakeFilepath.AbsCallCount()).To(Equal(1))
 					Expect(fakeMounter.MountCallCount()).To(Equal(1))
-					from, to, fstype, _, _ := fakeMounter.MountArgsForCall(0)
-					Expect(from).To(Equal("1.1.1.1:/"))
+					from, to, fstype, _, args := fakeMounter.MountArgsForCall(0)
+					Expect(from).To(Equal(":/"))
 					Expect(to).To(Equal("/path/to/mount/" + volumeName))
 					Expect(fstype).To(Equal("nfs4"))
+					Expect(args).To(ContainSubstring("1.1.1.1"))
 				})
 			})
 		})
