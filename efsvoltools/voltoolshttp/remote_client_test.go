@@ -36,7 +36,7 @@ var _ = Describe("RemoteClient", func() {
 	BeforeEach(func() {
 		testLogger = lagertest.NewTestLogger("LocalDriver Server Test")
 		testCtx = context.TODO()
-		testEnv = driverhttp.NewHttpDriverEnv(&testLogger, &testCtx)
+		testEnv = driverhttp.NewHttpDriverEnv(testLogger, testCtx)
 
 		httpClient = new(http_fake.FakeClient)
 		fakeClock = fakeclock.NewFakeClock(time.Now())
