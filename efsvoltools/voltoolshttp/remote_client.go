@@ -67,7 +67,7 @@ func NewRemoteClientWithClient(socketPath string, client http_wrap.Client, clock
 }
 
 func (r *remoteClient) OpenPerms(env voldriver.Env, request efsvoltools.OpenPermsRequest) efsvoltools.ErrorResponse {
-	logger := (*env.Logger()).Session("open-perms", lager.Data{"request": request})
+	logger := env.Logger().Session("open-perms", lager.Data{"request": request})
 	logger.Info("start")
 	defer logger.Info("end")
 
@@ -79,7 +79,7 @@ func (r *remoteClient) OpenPerms(env voldriver.Env, request efsvoltools.OpenPerm
 
 	httpRequest := newReqFactory(r.reqGen, efsvoltools.OpenPermsRoute, payload)
 
-	response, err := r.do(driverhttp.EnvWithLogger(&logger, env), httpRequest)
+	response, err := r.do(driverhttp.EnvWithLogger(logger, env), httpRequest)
 	if err != nil {
 		logger.Error("failed-creating-volume", err)
 		return efsvoltools.ErrorResponse{Err: err.Error()}
@@ -119,7 +119,7 @@ func (r *remoteClient) do(env voldriver.Env, requestFactory *reqFactory) (*os_ht
 		request  *os_http.Request
 	)
 
-	logger := (*env.Logger()).Session("do")
+	logger := env.Logger().Session("do")
 
 	request, err = requestFactory.Request()
 	if err != nil {

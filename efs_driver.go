@@ -61,7 +61,7 @@ func NewEfsDriver(logger lager.Logger, os osshim.Os, filepath filepathshim.Filep
 	}
 
 	ctx := context.TODO()
-	env := driverhttp.NewHttpDriverEnv(&logger, &ctx)
+	env := driverhttp.NewHttpDriverEnv(logger, ctx)
 
 	d.restoreState(env)
 	d.checkMounts(env)
@@ -76,7 +76,7 @@ func (d *EfsDriver) Activate(env voldriver.Env) voldriver.ActivateResponse {
 }
 
 func (d *EfsDriver) Create(env voldriver.Env, createRequest voldriver.CreateRequest) voldriver.ErrorResponse {
-	logger := (*env.Logger()).Session("create")
+	logger := env.Logger().Session("create")
 	logger.Info("start")
 	defer logger.Info("end")
 
@@ -92,7 +92,7 @@ func (d *EfsDriver) Create(env voldriver.Env, createRequest voldriver.CreateRequ
 		return voldriver.ErrorResponse{Err: `Missing mandatory 'ip' field in 'Opts'`}
 	}
 
-	_, err := d.getVolume(driverhttp.EnvWithLogger(&logger, env), createRequest.Name)
+	_, err := d.getVolume(driverhttp.EnvWithLogger(logger, env), createRequest.Name)
 
 	if err != nil {
 		logger.Info("creating-volume", lager.Data{"volume_name": createRequest.Name})
@@ -107,7 +107,7 @@ func (d *EfsDriver) Create(env voldriver.Env, createRequest voldriver.CreateRequ
 
 		d.volumes[createRequest.Name] = &volInfo
 
-		err := d.persistState(driverhttp.EnvWithLogger(&logger, env))
+		err := d.persistState(driverhttp.EnvWithLogger(logger, env))
 		if err != nil {
 			logger.Error("persist-state-failed", err)
 			return voldriver.ErrorResponse{Err: fmt.Sprintf("persist state failed when creating: %s", err.Error())}
@@ -134,7 +134,7 @@ func (d *EfsDriver) List(_ voldriver.Env) voldriver.ListResponse {
 }
 
 func (d *EfsDriver) Mount(env voldriver.Env, mountRequest voldriver.MountRequest) voldriver.MountResponse {
-	logger := (*env.Logger()).Session("mount", lager.Data{"volume": mountRequest.Name})
+	logger := env.Logger().Session("mount", lager.Data{"volume": mountRequest.Name})
 	logger.Info("start")
 	defer logger.Info("end")
 
@@ -142,16 +142,16 @@ func (d *EfsDriver) Mount(env voldriver.Env, mountRequest voldriver.MountRequest
 		return voldriver.MountResponse{Err: "Missing mandatory 'volume_name'"}
 	}
 
-	vol, err := d.getVolume(driverhttp.EnvWithLogger(&logger, env), mountRequest.Name)
+	vol, err := d.getVolume(driverhttp.EnvWithLogger(logger, env), mountRequest.Name)
 	if err != nil {
 		return voldriver.MountResponse{Err: fmt.Sprintf("Volume '%s' must be created before being mounted", mountRequest.Name)}
 	}
 
-	mountPath := d.mountPath(driverhttp.EnvWithLogger(&logger, env), vol.Name)
+	mountPath := d.mountPath(driverhttp.EnvWithLogger(logger, env), vol.Name)
 	logger.Info("mounting-volume", lager.Data{"id": vol.Name, "mountpoint": mountPath})
 
 	if vol.MountCount < 1 {
-		if err := d.mount(driverhttp.EnvWithLogger(&logger, env), vol.Ip, mountPath); err != nil {
+		if err := d.mount(driverhttp.EnvWithLogger(logger, env), vol.Ip, mountPath); err != nil {
 			logger.Error("mount-volume-failed", err)
 			return voldriver.MountResponse{Err: fmt.Sprintf("Error mounting volume: %s", err.Error())}
 		}
@@ -167,7 +167,7 @@ func (d *EfsDriver) Mount(env voldriver.Env, mountRequest voldriver.MountRequest
 
 	logger.Info("volume-mounted", lager.Data{"name": vol.Name, "count": vol.MountCount})
 
-	if err := d.persistState(driverhttp.EnvWithLogger(&logger, env)); err != nil {
+	if err := d.persistState(driverhttp.EnvWithLogger(logger, env)); err != nil {
 		logger.Error("persist-state-failed", err)
 		return voldriver.MountResponse{Err: fmt.Sprintf("persist state failed when mounting: %s", err.Error())}
 	}
@@ -177,13 +177,13 @@ func (d *EfsDriver) Mount(env voldriver.Env, mountRequest voldriver.MountRequest
 }
 
 func (d *EfsDriver) Path(env voldriver.Env, pathRequest voldriver.PathRequest) voldriver.PathResponse {
-	logger := (*env.Logger()).Session("path", lager.Data{"volume": pathRequest.Name})
+	logger := env.Logger().Session("path", lager.Data{"volume": pathRequest.Name})
 
 	if pathRequest.Name == "" {
 		return voldriver.PathResponse{Err: "Missing mandatory 'volume_name'"}
 	}
 
-	vol, err := d.getVolume(driverhttp.EnvWithLogger(&logger, env), pathRequest.Name)
+	vol, err := d.getVolume(driverhttp.EnvWithLogger(logger, env), pathRequest.Name)
 	if err != nil {
 		logger.Error("failed-no-such-volume-found", err, lager.Data{"mountpoint": vol.Mountpoint})
 
@@ -200,13 +200,13 @@ func (d *EfsDriver) Path(env voldriver.Env, pathRequest voldriver.PathRequest) v
 }
 
 func (d *EfsDriver) Unmount(env voldriver.Env, unmountRequest voldriver.UnmountRequest) voldriver.ErrorResponse {
-	logger := (*env.Logger()).Session("unmount", lager.Data{"volume": unmountRequest.Name})
+	logger := env.Logger().Session("unmount", lager.Data{"volume": unmountRequest.Name})
 
 	if unmountRequest.Name == "" {
 		return voldriver.ErrorResponse{Err: "Missing mandatory 'volume_name'"}
 	}
 
-	vol, err := d.getVolume(driverhttp.EnvWithLogger(&logger, env), unmountRequest.Name)
+	vol, err := d.getVolume(driverhttp.EnvWithLogger(logger, env), unmountRequest.Name)
 	if err != nil {
 		logger.Error("failed-no-such-volume-found", err, lager.Data{"mountpoint": vol.Mountpoint})
 
@@ -220,7 +220,7 @@ func (d *EfsDriver) Unmount(env voldriver.Env, unmountRequest voldriver.UnmountR
 	}
 
 	if vol.MountCount == 1 {
-		if err := d.unmount(driverhttp.EnvWithLogger(&logger, env), unmountRequest.Name, vol.Mountpoint); err != nil {
+		if err := d.unmount(driverhttp.EnvWithLogger(logger, env), unmountRequest.Name, vol.Mountpoint); err != nil {
 			return voldriver.ErrorResponse{Err: err.Error()}
 		}
 	}
@@ -236,7 +236,7 @@ func (d *EfsDriver) Unmount(env voldriver.Env, unmountRequest voldriver.UnmountR
 			delete(d.volumes, unmountRequest.Name)
 		}
 
-		if err = d.persistState(driverhttp.EnvWithLogger(&logger, env)); err != nil {
+		if err = d.persistState(driverhttp.EnvWithLogger(logger, env)); err != nil {
 			return voldriver.ErrorResponse{Err: fmt.Sprintf("failed to persist state when unmounting: %s", err.Error())}
 		}
 	}
@@ -245,7 +245,7 @@ func (d *EfsDriver) Unmount(env voldriver.Env, unmountRequest voldriver.UnmountR
 }
 
 func (d *EfsDriver) Remove(env voldriver.Env, removeRequest voldriver.RemoveRequest) voldriver.ErrorResponse {
-	logger := (*env.Logger()).Session("remove", lager.Data{"volume": removeRequest})
+	logger := env.Logger().Session("remove", lager.Data{"volume": removeRequest})
 	logger.Info("start")
 	defer logger.Info("end")
 
@@ -253,7 +253,7 @@ func (d *EfsDriver) Remove(env voldriver.Env, removeRequest voldriver.RemoveRequ
 		return voldriver.ErrorResponse{Err: "Missing mandatory 'volume_name'"}
 	}
 
-	vol, err := d.getVolume(driverhttp.EnvWithLogger(&logger, env), removeRequest.Name)
+	vol, err := d.getVolume(driverhttp.EnvWithLogger(logger, env), removeRequest.Name)
 
 	if err != nil {
 		logger.Error("warning-volume-removal", fmt.Errorf(fmt.Sprintf("Volume %s not found", removeRequest.Name)))
@@ -261,7 +261,7 @@ func (d *EfsDriver) Remove(env voldriver.Env, removeRequest voldriver.RemoveRequ
 	}
 
 	if vol.Mountpoint != "" {
-		if err := d.unmount(driverhttp.EnvWithLogger(&logger, env), removeRequest.Name, vol.Mountpoint); err != nil {
+		if err := d.unmount(driverhttp.EnvWithLogger(logger, env), removeRequest.Name, vol.Mountpoint); err != nil {
 			return voldriver.ErrorResponse{Err: err.Error()}
 		}
 	}
@@ -272,7 +272,7 @@ func (d *EfsDriver) Remove(env voldriver.Env, removeRequest voldriver.RemoveRequ
 	defer d.volumesLock.Unlock()
 	delete(d.volumes, removeRequest.Name)
 
-	if err := d.persistState(driverhttp.EnvWithLogger(&logger, env)); err != nil {
+	if err := d.persistState(driverhttp.EnvWithLogger(logger, env)); err != nil {
 		return voldriver.ErrorResponse{Err: fmt.Sprintf("failed to persist state when removing: %s", err.Error())}
 	}
 
@@ -294,7 +294,7 @@ func (d *EfsDriver) Get(env voldriver.Env, getRequest voldriver.GetRequest) vold
 }
 
 func (d *EfsDriver) getVolume(env voldriver.Env, volumeName string) (EfsVolumeInfo, error) {
-	logger := (*env.Logger()).Session("get-volume")
+	logger := env.Logger().Session("get-volume")
 	d.volumesLock.RLock()
 	defer d.volumesLock.RUnlock()
 
@@ -314,7 +314,7 @@ func (d *EfsDriver) Capabilities(env voldriver.Env) voldriver.CapabilitiesRespon
 
 // efsvoltools.VolTools methods
 func (d *EfsDriver) OpenPerms(env voldriver.Env, request efsvoltools.OpenPermsRequest) efsvoltools.ErrorResponse {
-	logger := (*env.Logger()).Session("open-perms", lager.Data{"opts": request.Opts})
+	logger := env.Logger().Session("open-perms", lager.Data{"opts": request.Opts})
 	logger.Info("start")
 	defer logger.Info("end")
 	orig := syscall.Umask(000)
@@ -331,10 +331,10 @@ func (d *EfsDriver) OpenPerms(env voldriver.Env, request efsvoltools.OpenPermsRe
 		return efsvoltools.ErrorResponse{Err: `Missing mandatory 'ip' field in 'Opts'`}
 	}
 
-	mountPath := d.mountPath(driverhttp.EnvWithLogger(&logger, env), request.Name)
+	mountPath := d.mountPath(driverhttp.EnvWithLogger(logger, env), request.Name)
 	logger.Info("mounting-volume", lager.Data{"id": request.Name, "mountpoint": mountPath})
 
-	err := d.mount(driverhttp.EnvWithLogger(&logger, env), ip, mountPath)
+	err := d.mount(driverhttp.EnvWithLogger(logger, env), ip, mountPath)
 	if err != nil {
 		logger.Error("mount-volume-failed", err)
 		return efsvoltools.ErrorResponse{Err: fmt.Sprintf("Error mounting volume: %s", err.Error())}
@@ -348,7 +348,7 @@ func (d *EfsDriver) OpenPerms(env voldriver.Env, request efsvoltools.OpenPermsRe
 
 	logger.Info("volume-mounted", lager.Data{"name": request.Name})
 
-	if err := d.unmount(driverhttp.EnvWithLogger(&logger, env), request.Name, mountPath); err != nil {
+	if err := d.unmount(driverhttp.EnvWithLogger(logger, env), request.Name, mountPath); err != nil {
 		return efsvoltools.ErrorResponse{Err: err.Error()}
 	}
 
@@ -368,7 +368,7 @@ func (d *EfsDriver) exists(path string) (bool, error) {
 }
 
 func (d *EfsDriver) mountPath(env voldriver.Env, volumeId string) string {
-	logger := (*env.Logger()).Session("mount-path")
+	logger := env.Logger().Session("mount-path")
 	orig := syscall.Umask(000)
 	defer syscall.Umask(orig)
 
@@ -385,7 +385,7 @@ func (d *EfsDriver) mountPath(env voldriver.Env, volumeId string) string {
 }
 
 func (d *EfsDriver) mount(env voldriver.Env, ip, mountPath string) error {
-	logger := (*env.Logger()).Session("mount", lager.Data{"ip": ip, "target": mountPath})
+	logger := env.Logger().Session("mount", lager.Data{"ip": ip, "target": mountPath})
 	logger.Info("start")
 	defer logger.Info("end")
 
@@ -410,7 +410,7 @@ func (d *EfsDriver) mount(env voldriver.Env, ip, mountPath string) error {
 func (d *EfsDriver) persistState(env voldriver.Env) error {
 	// TODO--why are we passing state instead of using the one in d?
 
-	logger := (*env.Logger()).Session("persist-state")
+	logger := env.Logger().Session("persist-state")
 	logger.Info("start")
 	defer logger.Info("end")
 
@@ -436,7 +436,7 @@ func (d *EfsDriver) persistState(env voldriver.Env) error {
 }
 
 func (d *EfsDriver) restoreState(env voldriver.Env) {
-	logger := (*env.Logger()).Session("restore-state")
+	logger := env.Logger().Session("restore-state")
 	logger.Info("start")
 	defer logger.Info("end")
 
@@ -463,7 +463,7 @@ func (d *EfsDriver) restoreState(env voldriver.Env) {
 }
 
 func (d *EfsDriver) unmount(env voldriver.Env, name string, mountPath string) error {
-	logger := (*env.Logger()).Session("unmount")
+	logger := env.Logger().Session("unmount")
 	logger.Info("start")
 	defer logger.Info("end")
 
@@ -498,7 +498,7 @@ func (d *EfsDriver) unmount(env voldriver.Env, name string, mountPath string) er
 }
 
 func (d *EfsDriver) checkMounts(env voldriver.Env) {
-	logger := (*env.Logger()).Session("check-mounts")
+	logger := env.Logger().Session("check-mounts")
 	logger.Info("start")
 	defer logger.Info("end")
 

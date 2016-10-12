@@ -41,7 +41,7 @@ var _ = Describe("Efs Driver", func() {
 	BeforeEach(func() {
 		logger = lagertest.NewTestLogger("efsdriver-local")
 		ctx = context.TODO()
-		env = driverhttp.NewHttpDriverEnv(&logger, &ctx)
+		env = driverhttp.NewHttpDriverEnv(logger, ctx)
 
 		mountDir = "/path/to/mount"
 

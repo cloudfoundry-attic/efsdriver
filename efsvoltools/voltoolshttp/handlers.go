@@ -8,8 +8,8 @@ import (
 	cf_http_handlers "code.cloudfoundry.org/cfhttp/handlers"
 	"code.cloudfoundry.org/efsdriver/efsvoltools"
 	"code.cloudfoundry.org/lager"
-	"github.com/tedsuo/rata"
 	"code.cloudfoundry.org/voldriver/driverhttp"
+	"github.com/tedsuo/rata"
 )
 
 func NewHandler(logger lager.Logger, client efsvoltools.VolTools) (http.Handler, error) {
@@ -44,7 +44,7 @@ func newOpenPermsHandler(logger lager.Logger, client efsvoltools.VolTools) http.
 			return
 		}
 		ctx := req.Context()
-		env := driverhttp.NewHttpDriverEnv(&logger, &ctx)
+		env := driverhttp.NewHttpDriverEnv(logger, ctx)
 
 		openPermsResponse := client.OpenPerms(env, request)
 		if openPermsResponse.Err != "" {
