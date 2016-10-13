@@ -340,11 +340,6 @@ func (d *EfsDriver) OpenPerms(env voldriver.Env, request efsvoltools.OpenPermsRe
 		return efsvoltools.ErrorResponse{Err: fmt.Sprintf("Error mounting volume: %s", err.Error())}
 	}
 
-	err = d.os.Chown(mountPath, d.os.Getuid(), d.os.Getgid())
-	if err != nil {
-		logger.Error("volume-chown-failed", err)
-		return efsvoltools.ErrorResponse{Err: fmt.Sprintf("Error chowning volume: %s", err.Error())}
-	}
 	err = d.os.Chmod(mountPath, os.ModePerm)
 	if err != nil {
 		logger.Error("volume-chmod-failed", err)
