@@ -25,7 +25,7 @@ import (
 	"code.cloudfoundry.org/voldriver/driverhttp"
 )
 
-const mountOptions = "vers=4.0,rsize=1048576,wsize=1048576,hard,intr,timeo=600,retrans=2,actimeo=0,addr="
+const mountOptions = "vers=4.0,rsize=1048576,wsize=1048576,hard,intr,timeo=600,retrans=2,actimeo=0"
 
 type EfsVolumeInfo struct {
 	Ip                   string
@@ -45,7 +45,7 @@ type EfsDriver struct {
 
 //go:generate counterfeiter -o efsdriverfakes/fake_mounter.go . Mounter
 type Mounter interface {
-	Mount(source string, target string, fstype string, flags uintptr, data string) error
+	Mount(source string, target string, fstype string, flags uintptr, data string) ([]byte, error)
 	Unmount(target string, flags int) (err error)
 }
 
@@ -399,9 +399,10 @@ func (d *EfsDriver) mount(env voldriver.Env, ip, mountPath string) error {
 	}
 
 	// TODO--permissions & flags?
-	err = d.mounter.Mount(":/", mountPath, "nfs4", 0, mountOptions+ip)
+	output, err := d.mounter.Mount(ip+":/", mountPath, "nfs4", 0, mountOptions)
 	if err != nil {
-		logger.Error("mount-failed", err)
+		logger.Error("mount-failed: "+string(output), err)
+		err = fmt.Errorf("%s:(%s)", output, err.Error())
 	}
 	return err
 }

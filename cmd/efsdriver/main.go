@@ -112,7 +112,7 @@ func main() {
 		&ioutilshim.IoutilShim{},
 		&execshim.ExecShim{},
 		*mountDir,
-		&efsdriver.NfsMounter{},
+		efsdriver.NewNfsMounter(&execshim.ExecShim{}),
 	)
 
 	if *transport == "tcp" {

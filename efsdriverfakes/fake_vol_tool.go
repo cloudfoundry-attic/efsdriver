@@ -18,6 +18,8 @@ type FakeVolTools struct {
 	openPermsReturns struct {
 		result1 efsvoltools.ErrorResponse
 	}
+	invocations      map[string][][]interface{}
+	invocationsMutex sync.RWMutex
 }
 
 func (fake *FakeVolTools) OpenPerms(env voldriver.Env, getRequest efsvoltools.OpenPermsRequest) efsvoltools.ErrorResponse {
@@ -26,6 +28,7 @@ func (fake *FakeVolTools) OpenPerms(env voldriver.Env, getRequest efsvoltools.Op
 		env        voldriver.Env
 		getRequest efsvoltools.OpenPermsRequest
 	}{env, getRequest})
+	fake.recordInvocation("OpenPerms", []interface{}{env, getRequest})
 	fake.openPermsMutex.Unlock()
 	if fake.OpenPermsStub != nil {
 		return fake.OpenPermsStub(env, getRequest)
@@ -51,6 +54,26 @@ func (fake *FakeVolTools) OpenPermsReturns(result1 efsvoltools.ErrorResponse) {
 	fake.openPermsReturns = struct {
 		result1 efsvoltools.ErrorResponse
 	}{result1}
+}
+
+func (fake *FakeVolTools) Invocations() map[string][][]interface{} {
+	fake.invocationsMutex.RLock()
+	defer fake.invocationsMutex.RUnlock()
+	fake.openPermsMutex.RLock()
+	defer fake.openPermsMutex.RUnlock()
+	return fake.invocations
+}
+
+func (fake *FakeVolTools) recordInvocation(key string, args []interface{}) {
+	fake.invocationsMutex.Lock()
+	defer fake.invocationsMutex.Unlock()
+	if fake.invocations == nil {
+		fake.invocations = map[string][][]interface{}{}
+	}
+	if fake.invocations[key] == nil {
+		fake.invocations[key] = [][]interface{}{}
+	}
+	fake.invocations[key] = append(fake.invocations[key], args)
 }
 
 var _ efsvoltools.VolTools = new(FakeVolTools)

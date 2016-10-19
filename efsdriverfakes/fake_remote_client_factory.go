@@ -18,6 +18,8 @@ type FakeEfsRemoteClientFactory struct {
 		result1 efsvoltools.VolTools
 		result2 error
 	}
+	invocations      map[string][][]interface{}
+	invocationsMutex sync.RWMutex
 }
 
 func (fake *FakeEfsRemoteClientFactory) NewRemoteClient(url string) (efsvoltools.VolTools, error) {
@@ -25,6 +27,7 @@ func (fake *FakeEfsRemoteClientFactory) NewRemoteClient(url string) (efsvoltools
 	fake.newRemoteClientArgsForCall = append(fake.newRemoteClientArgsForCall, struct {
 		url string
 	}{url})
+	fake.recordInvocation("NewRemoteClient", []interface{}{url})
 	fake.newRemoteClientMutex.Unlock()
 	if fake.NewRemoteClientStub != nil {
 		return fake.NewRemoteClientStub(url)
@@ -51,6 +54,26 @@ func (fake *FakeEfsRemoteClientFactory) NewRemoteClientReturns(result1 efsvoltoo
 		result1 efsvoltools.VolTools
 		result2 error
 	}{result1, result2}
+}
+
+func (fake *FakeEfsRemoteClientFactory) Invocations() map[string][][]interface{} {
+	fake.invocationsMutex.RLock()
+	defer fake.invocationsMutex.RUnlock()
+	fake.newRemoteClientMutex.RLock()
+	defer fake.newRemoteClientMutex.RUnlock()
+	return fake.invocations
+}
+
+func (fake *FakeEfsRemoteClientFactory) recordInvocation(key string, args []interface{}) {
+	fake.invocationsMutex.Lock()
+	defer fake.invocationsMutex.Unlock()
+	if fake.invocations == nil {
+		fake.invocations = map[string][][]interface{}{}
+	}
+	if fake.invocations[key] == nil {
+		fake.invocations[key] = [][]interface{}{}
+	}
+	fake.invocations[key] = append(fake.invocations[key], args)
 }
 
 var _ voltoolshttp.EfsRemoteClientFactory = new(FakeEfsRemoteClientFactory)
