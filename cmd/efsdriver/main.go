@@ -107,6 +107,8 @@ func main() {
 	logger.Info("start")
 	defer logger.Info("end")
 
+	mounter := nfsdriver.NewNfsMounter(&execshim.ExecShim{})
+
 	client := nfsdriver.NewNfsDriver(
 		logger,
 		&osshim.OsShim{},
@@ -114,7 +116,7 @@ func main() {
 		&ioutilshim.IoutilShim{},
 		&execshim.ExecShim{},
 		*mountDir,
-		nfsdriver.NewNfsMounter(&execshim.ExecShim{}),
+		mounter,
 	)
 
 	efsvoltools := voltoolslocal.NewEfsVolToolsLocal(
@@ -123,7 +125,7 @@ func main() {
 		&ioutilshim.IoutilShim{},
 		&execshim.ExecShim{},
 		*mountDir,
-		nfsdriver.NewNfsMounter(&execshim.ExecShim{}),
+		mounter,
 	)
 
 	if *transport == "tcp" {
