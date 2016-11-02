@@ -134,7 +134,7 @@ func (d *EfsVolToolsLocal) mount(env voldriver.Env, ip, mountPath string) error 
 	}
 
 	// TODO--permissions & flags?
-	output, err := d.mounter.Mount(ip+":/", mountPath, "nfs4", 0, mountOptions)
+	output, err := d.mounter.Mount(env.Context(), ip+":/", mountPath, "nfs4", 0, mountOptions)
 	if err != nil {
 		logger.Error("mount-failed: "+string(output), err)
 		err = fmt.Errorf("%s:(%s)", output, err.Error())
@@ -216,7 +216,7 @@ func (d *EfsVolToolsLocal) unmount(env voldriver.Env, name string, mountPath str
 
 	logger.Info("unmount-volume-folder", lager.Data{"mountpath": mountPath})
 
-	err = d.mounter.Unmount(mountPath, 0)
+	err = d.mounter.Unmount(env.Context(), mountPath, 0)
 	if err != nil {
 		logger.Error("unmount-failed", err)
 		return fmt.Errorf("Error unmounting volume: %s", err.Error())

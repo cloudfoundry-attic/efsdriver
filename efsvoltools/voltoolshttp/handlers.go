@@ -43,8 +43,7 @@ func newOpenPermsHandler(logger lager.Logger, client efsvoltools.VolTools) http.
 			cf_http_handlers.WriteJSONResponse(w, http.StatusBadRequest, efsvoltools.ErrorResponse{Err: err.Error()})
 			return
 		}
-		ctx := req.Context()
-		env := driverhttp.NewHttpDriverEnv(logger, ctx)
+		env := driverhttp.EnvWithMonitor(logger, req.Context(), w)
 
 		openPermsResponse := client.OpenPerms(env, request)
 		if openPermsResponse.Err != "" {
