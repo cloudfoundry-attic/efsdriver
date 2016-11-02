@@ -10,7 +10,7 @@ import (
 
 func TestEfsdriver(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Efsdriver Suite")
+	RunSpecs(t, "Efs Main Suite")
 }
 
 var driverPath string

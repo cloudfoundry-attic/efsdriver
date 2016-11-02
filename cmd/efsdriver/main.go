@@ -10,13 +10,15 @@ import (
 	cf_lager "code.cloudfoundry.org/cflager"
 	cf_debug_server "code.cloudfoundry.org/debugserver"
 
-	"code.cloudfoundry.org/efsdriver"
+	"code.cloudfoundry.org/efsdriver/efsvoltools"
 	"code.cloudfoundry.org/efsdriver/efsvoltools/voltoolshttp"
+	"code.cloudfoundry.org/efsdriver/efsvoltools/voltoolslocal"
 	"code.cloudfoundry.org/goshims/execshim"
 	"code.cloudfoundry.org/goshims/filepathshim"
 	"code.cloudfoundry.org/goshims/ioutilshim"
 	"code.cloudfoundry.org/goshims/osshim"
 	"code.cloudfoundry.org/lager"
+	"code.cloudfoundry.org/nfsdriver"
 	"code.cloudfoundry.org/voldriver"
 	"code.cloudfoundry.org/voldriver/driverhttp"
 	"github.com/tedsuo/ifrit"
@@ -105,20 +107,29 @@ func main() {
 	logger.Info("start")
 	defer logger.Info("end")
 
-	client := efsdriver.NewEfsDriver(
+	client := nfsdriver.NewNfsDriver(
 		logger,
 		&osshim.OsShim{},
 		&filepathshim.FilepathShim{},
 		&ioutilshim.IoutilShim{},
 		&execshim.ExecShim{},
 		*mountDir,
-		efsdriver.NewNfsMounter(&execshim.ExecShim{}),
+		nfsdriver.NewNfsMounter(&execshim.ExecShim{}),
+	)
+
+	efsvoltools := voltoolslocal.NewEfsVolToolsLocal(
+		&osshim.OsShim{},
+		&filepathshim.FilepathShim{},
+		&ioutilshim.IoutilShim{},
+		&execshim.ExecShim{},
+		*mountDir,
+		nfsdriver.NewNfsMounter(&execshim.ExecShim{}),
 	)
 
 	if *transport == "tcp" {
-		localDriverServer = createEfsDriverServer(logger, client, *atAddress, *driversPath, false, *efsVolToolsAddress)
+		localDriverServer = createEfsDriverServer(logger, client, efsvoltools, *atAddress, *driversPath, false, *efsVolToolsAddress)
 	} else if *transport == "tcp-json" {
-		localDriverServer = createEfsDriverServer(logger, client, *atAddress, *driversPath, true, *efsVolToolsAddress)
+		localDriverServer = createEfsDriverServer(logger, client, efsvoltools, *atAddress, *driversPath, true, *efsVolToolsAddress)
 	} else {
 		localDriverServer = createEfsDriverUnixServer(logger, client, *atAddress)
 	}
@@ -155,7 +166,7 @@ func processRunnerFor(servers grouper.Members) ifrit.Runner {
 	return sigmon.New(grouper.NewOrdered(os.Interrupt, servers))
 }
 
-func createEfsDriverServer(logger lager.Logger, client *efsdriver.EfsDriver, atAddress, driversPath string, jsonSpec bool, efsToolsAddress string) ifrit.Runner {
+func createEfsDriverServer(logger lager.Logger, client voldriver.Driver, efsvoltools efsvoltools.VolTools, atAddress, driversPath string, jsonSpec bool, efsToolsAddress string) ifrit.Runner {
 	advertisedUrl := "http://" + atAddress
 	logger.Info("writing-spec-file", lager.Data{"location": driversPath, "name": "efsdriver", "address": advertisedUrl})
 	if jsonSpec {
@@ -197,7 +208,7 @@ func createEfsDriverServer(logger lager.Logger, client *efsdriver.EfsDriver, atA
 	}
 
 	if efsToolsAddress != "" {
-		efsToolsHandler, err := voltoolshttp.NewHandler(logger, client)
+		efsToolsHandler, err := voltoolshttp.NewHandler(logger, efsvoltools)
 		exitOnFailure(logger, err)
 		efsServer := http_server.New(efsToolsAddress, efsToolsHandler)
 		server = grouper.NewParallel(os.Interrupt, grouper.Members{{"voldriver", server}, {"efstools", efsServer}})
@@ -205,7 +216,8 @@ func createEfsDriverServer(logger lager.Logger, client *efsdriver.EfsDriver, atA
 
 	return server
 }
-func createEfsDriverUnixServer(logger lager.Logger, client *efsdriver.EfsDriver, atAddress string) ifrit.Runner {
+
+func createEfsDriverUnixServer(logger lager.Logger, client voldriver.Driver, atAddress string) ifrit.Runner {
 	handler, err := driverhttp.NewHandler(logger, client)
 	exitOnFailure(logger, err)
 	return http_server.NewUnixServer(atAddress, handler)

@@ -1,4 +1,4 @@
-package efsdriver_test
+package voltoolslocal_test
 
 import (
 	. "github.com/onsi/ginkgo"
@@ -9,5 +9,5 @@ import (
 
 func TestLocalDriver(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "EfsDriver Suite")
+	RunSpecs(t, "Efs Volume Tools Local Suite")
 }
