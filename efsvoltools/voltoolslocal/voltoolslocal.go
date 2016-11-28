@@ -20,8 +20,6 @@ import (
 	"code.cloudfoundry.org/voldriver/driverhttp"
 )
 
-const mountOptions = "vers=4.0,rsize=1048576,wsize=1048576,hard,intr,timeo=600,retrans=2,actimeo=0"
-
 type EfsVolumeInfo struct {
 	Ip                   string
 	voldriver.VolumeInfo // see voldriver.resources.go
@@ -134,10 +132,9 @@ func (d *EfsVolToolsLocal) mount(env voldriver.Env, ip, mountPath string) error 
 	}
 
 	// TODO--permissions & flags?
-	output, err := d.mounter.Mount(env.Context(), ip+":/", mountPath, "nfs4", 0, mountOptions)
+	err = d.mounter.Mount(env.Logger(), env.Context(), ip+":/", mountPath, nil)
 	if err != nil {
-		logger.Error("mount-failed: "+string(output), err)
-		err = fmt.Errorf("%s:(%s)", output, err.Error())
+		logger.Error("mount-failed", err)
 	}
 	return err
 }
@@ -216,7 +213,7 @@ func (d *EfsVolToolsLocal) unmount(env voldriver.Env, name string, mountPath str
 
 	logger.Info("unmount-volume-folder", lager.Data{"mountpath": mountPath})
 
-	err = d.mounter.Unmount(env.Context(), mountPath, 0)
+	err = d.mounter.Unmount(env.Logger(), env.Context(), mountPath)
 	if err != nil {
 		logger.Error("unmount-failed", err)
 		return fmt.Errorf("Error unmounting volume: %s", err.Error())

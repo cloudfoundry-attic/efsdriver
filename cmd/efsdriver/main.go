@@ -98,6 +98,9 @@ var insecureSkipVerify = flag.Bool(
 	"whether SSL communication should skip verification of server IP addresses in the certificate",
 )
 
+const fsType = "nfs4"
+const mountOptions = "vers=4.0,rsize=1048576,wsize=1048576,hard,intr,timeo=600,retrans=2,actimeo=0"
+
 func main() {
 	parseCommandLine()
 
@@ -107,7 +110,7 @@ func main() {
 	logger.Info("start")
 	defer logger.Info("end")
 
-	mounter := nfsdriver.NewNfsMounter(&execshim.ExecShim{})
+	mounter := nfsdriver.NewNfsMounter(&execshim.ExecShim{}, fsType, mountOptions)
 
 	client := nfsdriver.NewNfsDriver(
 		logger,
