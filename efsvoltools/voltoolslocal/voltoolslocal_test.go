@@ -26,7 +26,6 @@ var _ = Describe("Efs Driver", func() {
 	var fakeFilepath *filepath_fake.FakeFilepath
 	var fakeIoutil *ioutil_fake.FakeIoutil
 	var fakeMounter *nfsdriverfakes.FakeMounter
-	var fakeExec *exec_fake.FakeExec
 	var fakeCmd *exec_fake.FakeCmd
 	var efsDriver *voltoolslocal.EfsVolToolsLocal
 	var mountDir string
@@ -43,14 +42,12 @@ var _ = Describe("Efs Driver", func() {
 		fakeFilepath = &filepath_fake.FakeFilepath{}
 		fakeIoutil = &ioutil_fake.FakeIoutil{}
 		fakeMounter = &nfsdriverfakes.FakeMounter{}
-		fakeExec = &exec_fake.FakeExec{}
 		fakeCmd = &exec_fake.FakeCmd{}
-		fakeExec.CommandContextReturns(fakeCmd)
 	})
 
 	Context("created", func() {
 		BeforeEach(func() {
-			efsDriver = voltoolslocal.NewEfsVolToolsLocal(fakeOs, fakeFilepath, fakeIoutil, fakeExec, mountDir, fakeMounter)
+			efsDriver = voltoolslocal.NewEfsVolToolsLocal(fakeOs, fakeFilepath, fakeIoutil, mountDir, fakeMounter)
 		})
 
 		Describe("OpenPerms", func() {
@@ -63,7 +60,7 @@ var _ = Describe("Efs Driver", func() {
 				It("should mount the volume on the efs filesystem", func() {
 					Expect(fakeFilepath.AbsCallCount()).To(Equal(1))
 					Expect(fakeMounter.MountCallCount()).To(Equal(1))
-					_, _, from, to, _ := fakeMounter.MountArgsForCall(0)
+					_, from, to, _ := fakeMounter.MountArgsForCall(0)
 					Expect(from).To(Equal("1.1.1.1:/"))
 					Expect(to).To(Equal("/path/to/mount/" + volumeName))
 				})

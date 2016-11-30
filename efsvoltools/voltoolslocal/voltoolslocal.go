@@ -10,7 +10,6 @@ import (
 	"syscall"
 
 	"code.cloudfoundry.org/efsdriver/efsvoltools"
-	"code.cloudfoundry.org/goshims/execshim"
 	"code.cloudfoundry.org/goshims/filepathshim"
 	"code.cloudfoundry.org/goshims/ioutilshim"
 	"code.cloudfoundry.org/goshims/osshim"
@@ -28,18 +27,16 @@ type EfsVolumeInfo struct {
 type EfsVolToolsLocal struct {
 	os            osshim.Os
 	filepath      filepathshim.Filepath
-	exec          execshim.Exec
 	mountPathRoot string
 	mounter       nfsdriver.Mounter
 }
 
-func NewEfsVolToolsLocal(os osshim.Os, filepath filepathshim.Filepath, ioutil ioutilshim.Ioutil, exec execshim.Exec, mountPathRoot string, mounter nfsdriver.Mounter) *EfsVolToolsLocal {
+func NewEfsVolToolsLocal(os osshim.Os, filepath filepathshim.Filepath, ioutil ioutilshim.Ioutil, mountPathRoot string, mounter nfsdriver.Mounter) *EfsVolToolsLocal {
 	d := &EfsVolToolsLocal{
 		os:            os,
 		filepath:      filepath,
 		mountPathRoot: mountPathRoot,
 		mounter:       mounter,
-		exec:          exec,
 	}
 
 	return d
@@ -132,67 +129,12 @@ func (d *EfsVolToolsLocal) mount(env voldriver.Env, ip, mountPath string) error 
 	}
 
 	// TODO--permissions & flags?
-	err = d.mounter.Mount(env.Logger(), env.Context(), ip+":/", mountPath, nil)
+	err = d.mounter.Mount(driverhttp.EnvWithLogger(logger, env), ip+":/", mountPath, nil)
 	if err != nil {
 		logger.Error("mount-failed", err)
 	}
 	return err
 }
-
-//func (d *EfsDriver) persistState(env voldriver.Env) error {
-//	// TODO--why are we passing state instead of using the one in d?
-//
-//	logger := env.Logger().Session("persist-state")
-//	logger.Info("start")
-//	defer logger.Info("end")
-//
-//	orig := syscall.Umask(000)
-//	defer syscall.Umask(orig)
-//
-//	stateFile := filepath.Join(d.mountPathRoot, "efs-broker-state.json")
-//
-//	stateData, err := json.Marshal(d.volumes)
-//	if err != nil {
-//		logger.Error("failed-to-marshall-state", err)
-//		return err
-//	}
-//
-//	err = d.ioutil.WriteFile(stateFile, stateData, os.ModePerm)
-//	if err != nil {
-//		logger.Error(fmt.Sprintf("failed-to-write-state-file: %s", stateFile), err)
-//		return err
-//	}
-//
-//	logger.Debug("state-saved", lager.Data{"state-file": stateFile})
-//	return nil
-//}
-
-//func (d *EfsDriver) restoreState(env voldriver.Env) {
-//	logger := env.Logger().Session("restore-state")
-//	logger.Info("start")
-//	defer logger.Info("end")
-//
-//	stateFile := filepath.Join(d.mountPathRoot, "efs-broker-state.json")
-//
-//	stateData, err := d.ioutil.ReadFile(stateFile)
-//	if err != nil {
-//		logger.Info(fmt.Sprintf("failed-to-read-state-file: %s", stateFile), lager.Data{"err": err})
-//		return
-//	}
-//
-//	state := map[string]*EfsVolumeInfo{}
-//	err = json.Unmarshal(stateData, &state)
-//
-//	if err != nil {
-//		logger.Error(fmt.Sprintf("failed-to-unmarshall-state from state-file: %s", stateFile), err)
-//		return
-//	}
-//	logger.Info("state-restored", lager.Data{"state-file": stateFile})
-//
-//	d.volumesLock.Lock()
-//	defer d.volumesLock.Unlock()
-//	d.volumes = state
-//}
 
 func (d *EfsVolToolsLocal) unmount(env voldriver.Env, name string, mountPath string) error {
 	logger := env.Logger().Session("unmount")
@@ -213,7 +155,7 @@ func (d *EfsVolToolsLocal) unmount(env voldriver.Env, name string, mountPath str
 
 	logger.Info("unmount-volume-folder", lager.Data{"mountpath": mountPath})
 
-	err = d.mounter.Unmount(env.Logger(), env.Context(), mountPath)
+	err = d.mounter.Unmount(driverhttp.EnvWithLogger(logger, env), mountPath)
 	if err != nil {
 		logger.Error("unmount-failed", err)
 		return fmt.Errorf("Error unmounting volume: %s", err.Error())
@@ -228,26 +170,3 @@ func (d *EfsVolToolsLocal) unmount(env voldriver.Env, name string, mountPath str
 
 	return nil
 }
-
-//func (d *EfsDriver) checkMounts(env voldriver.Env) {
-//	logger := env.Logger().Session("check-mounts")
-//	logger.Info("start")
-//	defer logger.Info("end")
-//
-//	for key, mount := range d.volumes {
-//		ctx, _ := context.WithDeadline(context.TODO(), time.Now().Add(time.Second*5))
-//		cmd := d.exec.CommandContext(ctx, "mountpoint", "-q", mount.VolumeInfo.Mountpoint)
-//
-//		if err := cmd.Start(); err != nil {
-//			logger.Error("unexpected-command-invocation-error", err)
-//			continue
-//		}
-//
-//		if err := cmd.Wait(); err != nil {
-//			// Note: Created volumes (with no mounts) will be removed
-//			//       since VolumeInfo.Mountpoint will be an empty string
-//			logger.Info(fmt.Sprintf("unable to verify volume %s (%s)", key, err.Error()))
-//			delete(d.volumes, key)
-//		}
-//	}
-//}

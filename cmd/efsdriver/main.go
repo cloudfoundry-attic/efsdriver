@@ -13,7 +13,6 @@ import (
 	"code.cloudfoundry.org/efsdriver/efsvoltools"
 	"code.cloudfoundry.org/efsdriver/efsvoltools/voltoolshttp"
 	"code.cloudfoundry.org/efsdriver/efsvoltools/voltoolslocal"
-	"code.cloudfoundry.org/goshims/execshim"
 	"code.cloudfoundry.org/goshims/filepathshim"
 	"code.cloudfoundry.org/goshims/ioutilshim"
 	"code.cloudfoundry.org/goshims/osshim"
@@ -21,6 +20,7 @@ import (
 	"code.cloudfoundry.org/nfsdriver"
 	"code.cloudfoundry.org/voldriver"
 	"code.cloudfoundry.org/voldriver/driverhttp"
+	"code.cloudfoundry.org/voldriver/invoker"
 	"github.com/tedsuo/ifrit"
 	"github.com/tedsuo/ifrit/grouper"
 	"github.com/tedsuo/ifrit/http_server"
@@ -110,14 +110,13 @@ func main() {
 	logger.Info("start")
 	defer logger.Info("end")
 
-	mounter := nfsdriver.NewNfsMounter(&execshim.ExecShim{}, fsType, mountOptions)
+	mounter := nfsdriver.NewNfsMounter(invoker.NewRealInvoker(), fsType, mountOptions)
 
 	client := nfsdriver.NewNfsDriver(
 		logger,
 		&osshim.OsShim{},
 		&filepathshim.FilepathShim{},
 		&ioutilshim.IoutilShim{},
-		&execshim.ExecShim{},
 		*mountDir,
 		mounter,
 	)
@@ -126,7 +125,6 @@ func main() {
 		&osshim.OsShim{},
 		&filepathshim.FilepathShim{},
 		&ioutilshim.IoutilShim{},
-		&execshim.ExecShim{},
 		*mountDir,
 		mounter,
 	)
