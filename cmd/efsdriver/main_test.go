@@ -36,6 +36,7 @@ var _ = Describe("Main", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			command.Args = append(command.Args, "-driversPath="+dir)
+			command.Args = append(command.Args, `-availabilityZone="foo-foo-2a"`)
 		})
 
 		It("listens on tcp/9750 by default", func() {

@@ -92,6 +92,12 @@ var clientKeyFile = flag.String(
 	"the private key file to use with client ssl authentication",
 )
 
+var availabilityZone = flag.String(
+	"availabilityZone",
+	"",
+	"the EC2 AZ that this driver is running in",
+)
+
 var insecureSkipVerify = flag.Bool(
 	"insecureSkipVerify",
 	false,
@@ -107,7 +113,7 @@ func main() {
 	var localDriverServer ifrit.Runner
 
 	logger, logTap := newLogger()
-	logger.Info("start")
+	logger.Info("start", lager.Data{"availability-zone":availabilityZone})
 	defer logger.Info("end")
 
 	mounter := nfsdriver.NewNfsMounter(invoker.NewRealInvoker(), fsType, mountOptions)
