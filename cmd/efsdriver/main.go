@@ -25,6 +25,7 @@ import (
 	"github.com/tedsuo/ifrit/grouper"
 	"github.com/tedsuo/ifrit/http_server"
 	"github.com/tedsuo/ifrit/sigmon"
+	"code.cloudfoundry.org/efsdriver/efsmounter"
 )
 
 var atAddress = flag.String(
@@ -116,7 +117,7 @@ func main() {
 	logger.Info("start", lager.Data{"availability-zone":availabilityZone})
 	defer logger.Info("end")
 
-	mounter := nfsdriver.NewNfsMounter(invoker.NewRealInvoker(), fsType, mountOptions)
+	mounter := efsmounter.NewEfsMounter(invoker.NewRealInvoker(), fsType, mountOptions, *availabilityZone)
 
 	client := nfsdriver.NewNfsDriver(
 		logger,
