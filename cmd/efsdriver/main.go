@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 
 	cf_http "code.cloudfoundry.org/cfhttp"
-	cf_lager "code.cloudfoundry.org/cflager"
 	cf_debug_server "code.cloudfoundry.org/debugserver"
 
 	"code.cloudfoundry.org/efsdriver/efsvoltools"
@@ -26,6 +25,7 @@ import (
 	"github.com/tedsuo/ifrit/http_server"
 	"github.com/tedsuo/ifrit/sigmon"
 	"code.cloudfoundry.org/efsdriver/efsmounter"
+	"code.cloudfoundry.org/lager/lagerflags"
 )
 
 var atAddress = flag.String(
@@ -234,12 +234,12 @@ func createEfsDriverUnixServer(logger lager.Logger, client voldriver.Driver, atA
 }
 
 func newLogger() (lager.Logger, *lager.ReconfigurableSink) {
-	logger, reconfigurableSink := cf_lager.New("efs-driver-server")
+	logger, reconfigurableSink := lagerflags.New("efs-driver-server")
 	return logger, reconfigurableSink
 }
 
 func parseCommandLine() {
-	cf_lager.AddFlags(flag.CommandLine)
+	lagerflags.AddFlags(flag.CommandLine)
 	cf_debug_server.AddFlags(flag.CommandLine)
 	flag.Parse()
 }
