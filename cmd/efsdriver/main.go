@@ -9,6 +9,7 @@ import (
 	cf_http "code.cloudfoundry.org/cfhttp"
 	cf_debug_server "code.cloudfoundry.org/debugserver"
 
+	"code.cloudfoundry.org/efsdriver/efsmounter"
 	"code.cloudfoundry.org/efsdriver/efsvoltools"
 	"code.cloudfoundry.org/efsdriver/efsvoltools/voltoolshttp"
 	"code.cloudfoundry.org/efsdriver/efsvoltools/voltoolslocal"
@@ -16,7 +17,9 @@ import (
 	"code.cloudfoundry.org/goshims/ioutilshim"
 	"code.cloudfoundry.org/goshims/osshim"
 	"code.cloudfoundry.org/lager"
+	"code.cloudfoundry.org/lager/lagerflags"
 	"code.cloudfoundry.org/nfsdriver"
+	"code.cloudfoundry.org/nfsdriver/oshelper"
 	"code.cloudfoundry.org/voldriver"
 	"code.cloudfoundry.org/voldriver/driverhttp"
 	"code.cloudfoundry.org/voldriver/invoker"
@@ -24,8 +27,6 @@ import (
 	"github.com/tedsuo/ifrit/grouper"
 	"github.com/tedsuo/ifrit/http_server"
 	"github.com/tedsuo/ifrit/sigmon"
-	"code.cloudfoundry.org/efsdriver/efsmounter"
-	"code.cloudfoundry.org/lager/lagerflags"
 )
 
 var atAddress = flag.String(
@@ -114,7 +115,7 @@ func main() {
 	var localDriverServer ifrit.Runner
 
 	logger, logTap := newLogger()
-	logger.Info("start", lager.Data{"availability-zone":availabilityZone})
+	logger.Info("start", lager.Data{"availability-zone": availabilityZone})
 	defer logger.Info("end")
 
 	mounter := efsmounter.NewEfsMounter(invoker.NewRealInvoker(), fsType, mountOptions, *availabilityZone)
@@ -126,6 +127,7 @@ func main() {
 		&ioutilshim.IoutilShim{},
 		*mountDir,
 		mounter,
+		oshelper.NewOsHelper(),
 	)
 
 	efsvoltools := voltoolslocal.NewEfsVolToolsLocal(
