@@ -18,7 +18,7 @@ type Mounter interface {
 	Purge(env voldriver.Env, path string)
 }
 
-type nfsMounter struct {
+type efsMounter struct {
 	invoker     invoker.Invoker
 	fstype      string
 	defaultOpts string
@@ -26,10 +26,10 @@ type nfsMounter struct {
 }
 
 func NewEfsMounter(invoker invoker.Invoker, fstype, defaultOpts string, awsAZ string) Mounter {
-	return &nfsMounter{invoker, fstype, defaultOpts, awsAZ}
+	return &efsMounter{invoker, fstype, defaultOpts, awsAZ}
 }
 
-func (m *nfsMounter) Mount(env voldriver.Env, source string, target string, opts map[string]interface{}) error {
+func (m *efsMounter) Mount(env voldriver.Env, source string, target string, opts map[string]interface{}) error {
 	azMap, mapOk := opts["az-map"].(map[string]interface{})
 	if mapOk {
 		if mapSource, ok := azMap[m.awsAZ].(string); ok {
@@ -41,12 +41,12 @@ func (m *nfsMounter) Mount(env voldriver.Env, source string, target string, opts
 	return err
 }
 
-func (m *nfsMounter) Unmount(env voldriver.Env, target string) error {
+func (m *efsMounter) Unmount(env voldriver.Env, target string) error {
 	_, err := m.invoker.Invoke(env, "umount", []string{target})
 	return err
 }
 
-func (m *nfsMounter) Check(env voldriver.Env, name, mountPoint string) bool {
+func (m *efsMounter) Check(env voldriver.Env, name, mountPoint string) bool {
 	ctx, _ := context.WithDeadline(context.TODO(), time.Now().Add(time.Second*5))
 	env = driverhttp.EnvWithContext(ctx, env)
 	_, err := m.invoker.Invoke(env, "mountpoint", []string{"-q", mountPoint})
@@ -60,6 +60,6 @@ func (m *nfsMounter) Check(env voldriver.Env, name, mountPoint string) bool {
 	return true
 }
 
-func (m *nfsMounter) Purge(env voldriver.Env, path string) {
+func (m *efsMounter) Purge(env voldriver.Env, path string) {
 	return
 }
