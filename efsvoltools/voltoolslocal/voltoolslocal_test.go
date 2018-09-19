@@ -5,7 +5,6 @@ import (
 
 	"code.cloudfoundry.org/efsdriver/efsvoltools"
 	"code.cloudfoundry.org/efsdriver/efsvoltools/voltoolslocal"
-	"code.cloudfoundry.org/goshims/execshim/exec_fake"
 	"code.cloudfoundry.org/goshims/filepathshim/filepath_fake"
 	"code.cloudfoundry.org/goshims/ioutilshim/ioutil_fake"
 	"code.cloudfoundry.org/goshims/osshim/os_fake"
@@ -26,7 +25,6 @@ var _ = Describe("Efs Driver", func() {
 	var fakeFilepath *filepath_fake.FakeFilepath
 	var fakeIoutil *ioutil_fake.FakeIoutil
 	var fakeMounter *nfsdriverfakes.FakeMounter
-	var fakeCmd *exec_fake.FakeCmd
 	var efsDriver *voltoolslocal.EfsVolToolsLocal
 	var mountDir string
 	const volumeName = "test-volume-id"
@@ -42,7 +40,6 @@ var _ = Describe("Efs Driver", func() {
 		fakeFilepath = &filepath_fake.FakeFilepath{}
 		fakeIoutil = &ioutil_fake.FakeIoutil{}
 		fakeMounter = &nfsdriverfakes.FakeMounter{}
-		fakeCmd = &exec_fake.FakeCmd{}
 	})
 
 	Context("created", func() {
