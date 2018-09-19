@@ -3,7 +3,9 @@ package main_test
 import (
 	"io/ioutil"
 	"net"
+	"os"
 	"os/exec"
+	"path/filepath"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -31,11 +33,14 @@ var _ = Describe("Main", func() {
 	})
 
 	Context("with a driver path", func() {
+		var dir string
+
 		BeforeEach(func() {
-			dir, err := ioutil.TempDir("", "driversPath")
+			dir, err = ioutil.TempDir("", "driversPath")
 			Expect(err).ToNot(HaveOccurred())
 
 			command.Args = append(command.Args, "-driversPath="+dir)
+			command.Args = append(command.Args, "-transport=tcp-json")
 			command.Args = append(command.Args, `-availabilityZone="foo-foo-2a"`)
 		})
 
@@ -44,6 +49,41 @@ var _ = Describe("Main", func() {
 				_, err := net.Dial("tcp", "0.0.0.0:9750")
 				return err
 			}, 5).ShouldNot(HaveOccurred())
+
+			specFile := filepath.Join(dir, "efsdriver.json")
+			specFileContents, err := ioutil.ReadFile(specFile)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(string(specFileContents)).To(MatchJSON(`{
+				"Name": "efsdriver",
+				"Addr": "http://0.0.0.0:9750",
+				"TLSConfig": null,
+				"UniqueVolumeIds": false
+			}`))
+		})
+
+		Context("with unique volume IDs enabled", func() {
+			BeforeEach(func() {
+				command.Args = append(command.Args, "-uniqueVolumeIds")
+			})
+
+			It("sets the uniqueVolumeIds flag in the spec file", func() {
+				specFile := filepath.Join(dir, "efsdriver.json")
+				Eventually(func() error {
+					_, err := os.Stat(specFile)
+					return err
+				}, 5).ShouldNot(HaveOccurred())
+
+				specFileContents, err := ioutil.ReadFile(specFile)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(string(specFileContents)).To(MatchJSON(`{
+					"Name": "efsdriver",
+					"Addr": "http://0.0.0.0:9750",
+					"TLSConfig": null,
+					"UniqueVolumeIds": true
+				}`))
+			})
 		})
 	})
 })

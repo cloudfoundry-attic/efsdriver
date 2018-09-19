@@ -106,6 +106,12 @@ var insecureSkipVerify = flag.Bool(
 	"whether SSL communication should skip verification of server IP addresses in the certificate",
 )
 
+var uniqueVolumeIds = flag.Bool(
+	"uniqueVolumeIds",
+	false,
+	"whether the EFS driver should opt-in to unique volumes",
+)
+
 const fsType = "nfs4"
 const mountOptions = "vers=4.0,rsize=1048576,wsize=1048576,hard,intr,timeo=600,retrans=2,actimeo=0"
 
@@ -139,9 +145,9 @@ func main() {
 	)
 
 	if *transport == "tcp" {
-		localDriverServer = createEfsDriverServer(logger, client, efsvoltools, *atAddress, *driversPath, false, *efsVolToolsAddress)
+		localDriverServer = createEfsDriverServer(logger, client, efsvoltools, *atAddress, *driversPath, false, *efsVolToolsAddress, false)
 	} else if *transport == "tcp-json" {
-		localDriverServer = createEfsDriverServer(logger, client, efsvoltools, *atAddress, *driversPath, true, *efsVolToolsAddress)
+		localDriverServer = createEfsDriverServer(logger, client, efsvoltools, *atAddress, *driversPath, true, *efsVolToolsAddress, *uniqueVolumeIds)
 	} else {
 		localDriverServer = createEfsDriverUnixServer(logger, client, *atAddress)
 	}
@@ -178,11 +184,11 @@ func processRunnerFor(servers grouper.Members) ifrit.Runner {
 	return sigmon.New(grouper.NewOrdered(os.Interrupt, servers))
 }
 
-func createEfsDriverServer(logger lager.Logger, client voldriver.Driver, efsvoltools efsvoltools.VolTools, atAddress, driversPath string, jsonSpec bool, efsToolsAddress string) ifrit.Runner {
+func createEfsDriverServer(logger lager.Logger, client voldriver.Driver, efsvoltools efsvoltools.VolTools, atAddress, driversPath string, jsonSpec bool, efsToolsAddress string, uniqueVolumeIds bool) ifrit.Runner {
 	advertisedUrl := "http://" + atAddress
-	logger.Info("writing-spec-file", lager.Data{"location": driversPath, "name": "efsdriver", "address": advertisedUrl})
+	logger.Info("writing-spec-file", lager.Data{"location": driversPath, "name": "efsdriver", "address": advertisedUrl, "unique-volume-ids": uniqueVolumeIds})
 	if jsonSpec {
-		driverJsonSpec := voldriver.DriverSpec{Name: "efsdriver", Address: advertisedUrl}
+		driverJsonSpec := voldriver.DriverSpec{Name: "efsdriver", Address: advertisedUrl, UniqueVolumeIds: uniqueVolumeIds}
 
 		if *requireSSL {
 			absCaFile, err := filepath.Abs(*caFile)
