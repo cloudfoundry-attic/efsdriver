@@ -8,7 +8,6 @@ import (
 
 	cf_http "code.cloudfoundry.org/cfhttp"
 	cf_debug_server "code.cloudfoundry.org/debugserver"
-
 	"code.cloudfoundry.org/efsdriver/efsmounter"
 	"code.cloudfoundry.org/efsdriver/efsvoltools"
 	"code.cloudfoundry.org/efsdriver/efsvoltools/voltoolshttp"
@@ -242,8 +241,10 @@ func createEfsDriverUnixServer(logger lager.Logger, client voldriver.Driver, atA
 }
 
 func newLogger() (lager.Logger, *lager.ReconfigurableSink) {
-	logger, reconfigurableSink := lagerflags.New("efs-driver-server")
-	return logger, reconfigurableSink
+	lagerConfig := lagerflags.ConfigFromFlags()
+	lagerConfig.RedactSecrets = true
+
+	return lagerflags.NewFromConfig("efs-driver-server", lagerConfig)
 }
 
 func parseCommandLine() {
