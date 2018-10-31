@@ -14,9 +14,9 @@ import (
 	"code.cloudfoundry.org/goshims/ioutilshim"
 	"code.cloudfoundry.org/goshims/osshim"
 	"code.cloudfoundry.org/lager"
-	"code.cloudfoundry.org/nfsdriver"
 	"code.cloudfoundry.org/voldriver"
 	"code.cloudfoundry.org/voldriver/driverhttp"
+	"code.cloudfoundry.org/volumedriver"
 )
 
 type EfsVolumeInfo struct {
@@ -28,10 +28,10 @@ type EfsVolToolsLocal struct {
 	os            osshim.Os
 	filepath      filepathshim.Filepath
 	mountPathRoot string
-	mounter       nfsdriver.Mounter
+	mounter       volumedriver.Mounter
 }
 
-func NewEfsVolToolsLocal(os osshim.Os, filepath filepathshim.Filepath, ioutil ioutilshim.Ioutil, mountPathRoot string, mounter nfsdriver.Mounter) *EfsVolToolsLocal {
+func NewEfsVolToolsLocal(os osshim.Os, filepath filepathshim.Filepath, ioutil ioutilshim.Ioutil, mountPathRoot string, mounter volumedriver.Mounter) *EfsVolToolsLocal {
 	d := &EfsVolToolsLocal{
 		os:            os,
 		filepath:      filepath,

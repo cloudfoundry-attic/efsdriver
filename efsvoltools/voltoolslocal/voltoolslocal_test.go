@@ -10,9 +10,9 @@ import (
 	"code.cloudfoundry.org/goshims/osshim/os_fake"
 	"code.cloudfoundry.org/lager"
 	"code.cloudfoundry.org/lager/lagertest"
-	"code.cloudfoundry.org/nfsdriver/nfsdriverfakes"
 	"code.cloudfoundry.org/voldriver"
 	"code.cloudfoundry.org/voldriver/driverhttp"
+	"code.cloudfoundry.org/volumedriver/volumedriverfakes"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -24,7 +24,7 @@ var _ = Describe("Efs Driver", func() {
 	var fakeOs *os_fake.FakeOs
 	var fakeFilepath *filepath_fake.FakeFilepath
 	var fakeIoutil *ioutil_fake.FakeIoutil
-	var fakeMounter *nfsdriverfakes.FakeMounter
+	var fakeMounter *volumedriverfakes.FakeMounter
 	var efsDriver *voltoolslocal.EfsVolToolsLocal
 	var mountDir string
 	const volumeName = "test-volume-id"
@@ -39,7 +39,7 @@ var _ = Describe("Efs Driver", func() {
 		fakeOs = &os_fake.FakeOs{}
 		fakeFilepath = &filepath_fake.FakeFilepath{}
 		fakeIoutil = &ioutil_fake.FakeIoutil{}
-		fakeMounter = &nfsdriverfakes.FakeMounter{}
+		fakeMounter = &volumedriverfakes.FakeMounter{}
 	})
 
 	Context("created", func() {
