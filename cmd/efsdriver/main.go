@@ -8,6 +8,9 @@ import (
 
 	cf_http "code.cloudfoundry.org/cfhttp"
 	cf_debug_server "code.cloudfoundry.org/debugserver"
+	"code.cloudfoundry.org/dockerdriver"
+	"code.cloudfoundry.org/dockerdriver/driverhttp"
+	"code.cloudfoundry.org/dockerdriver/invoker"
 	"code.cloudfoundry.org/efsdriver/efsmounter"
 	"code.cloudfoundry.org/efsdriver/efsvoltools"
 	"code.cloudfoundry.org/efsdriver/efsvoltools/voltoolshttp"
@@ -18,9 +21,6 @@ import (
 	"code.cloudfoundry.org/goshims/osshim"
 	"code.cloudfoundry.org/lager"
 	"code.cloudfoundry.org/lager/lagerflags"
-	"code.cloudfoundry.org/voldriver"
-	"code.cloudfoundry.org/voldriver/driverhttp"
-	"code.cloudfoundry.org/voldriver/invoker"
 	"code.cloudfoundry.org/volumedriver"
 	"code.cloudfoundry.org/volumedriver/mountchecker"
 	"code.cloudfoundry.org/volumedriver/oshelper"
@@ -186,11 +186,11 @@ func processRunnerFor(servers grouper.Members) ifrit.Runner {
 	return sigmon.New(grouper.NewOrdered(os.Interrupt, servers))
 }
 
-func createEfsDriverServer(logger lager.Logger, client voldriver.Driver, efsvoltools efsvoltools.VolTools, atAddress, driversPath string, jsonSpec bool, efsToolsAddress string, uniqueVolumeIds bool) ifrit.Runner {
+func createEfsDriverServer(logger lager.Logger, client dockerdriver.Driver, efsvoltools efsvoltools.VolTools, atAddress, driversPath string, jsonSpec bool, efsToolsAddress string, uniqueVolumeIds bool) ifrit.Runner {
 	advertisedUrl := "http://" + atAddress
 	logger.Info("writing-spec-file", lager.Data{"location": driversPath, "name": "efsdriver", "address": advertisedUrl, "unique-volume-ids": uniqueVolumeIds})
 	if jsonSpec {
-		driverJsonSpec := voldriver.DriverSpec{Name: "efsdriver", Address: advertisedUrl, UniqueVolumeIds: uniqueVolumeIds}
+		driverJsonSpec := dockerdriver.DriverSpec{Name: "efsdriver", Address: advertisedUrl, UniqueVolumeIds: uniqueVolumeIds}
 
 		if *requireSSL {
 			absCaFile, err := filepath.Abs(*caFile)
@@ -199,17 +199,17 @@ func createEfsDriverServer(logger lager.Logger, client voldriver.Driver, efsvolt
 			exitOnFailure(logger, err)
 			absClientKeyFile, err := filepath.Abs(*clientKeyFile)
 			exitOnFailure(logger, err)
-			driverJsonSpec.TLSConfig = &voldriver.TLSConfig{InsecureSkipVerify: *insecureSkipVerify, CAFile: absCaFile, CertFile: absClientCertFile, KeyFile: absClientKeyFile}
+			driverJsonSpec.TLSConfig = &dockerdriver.TLSConfig{InsecureSkipVerify: *insecureSkipVerify, CAFile: absCaFile, CertFile: absClientCertFile, KeyFile: absClientKeyFile}
 			driverJsonSpec.Address = "https://" + atAddress
 		}
 
 		jsonBytes, err := json.Marshal(driverJsonSpec)
 
 		exitOnFailure(logger, err)
-		err = voldriver.WriteDriverSpec(logger, driversPath, "efsdriver", "json", jsonBytes)
+		err = dockerdriver.WriteDriverSpec(logger, driversPath, "efsdriver", "json", jsonBytes)
 		exitOnFailure(logger, err)
 	} else {
-		err := voldriver.WriteDriverSpec(logger, driversPath, "efsdriver", "spec", []byte(advertisedUrl))
+		err := dockerdriver.WriteDriverSpec(logger, driversPath, "efsdriver", "spec", []byte(advertisedUrl))
 		exitOnFailure(logger, err)
 	}
 
@@ -231,13 +231,13 @@ func createEfsDriverServer(logger lager.Logger, client voldriver.Driver, efsvolt
 		efsToolsHandler, err := voltoolshttp.NewHandler(logger, efsvoltools)
 		exitOnFailure(logger, err)
 		efsServer := http_server.New(efsToolsAddress, efsToolsHandler)
-		server = grouper.NewParallel(os.Interrupt, grouper.Members{{"voldriver", server}, {"efstools", efsServer}})
+		server = grouper.NewParallel(os.Interrupt, grouper.Members{{"dockerdriver", server}, {"efstools", efsServer}})
 	}
 
 	return server
 }
 
-func createEfsDriverUnixServer(logger lager.Logger, client voldriver.Driver, atAddress string) ifrit.Runner {
+func createEfsDriverUnixServer(logger lager.Logger, client dockerdriver.Driver, atAddress string) ifrit.Runner {
 	handler, err := driverhttp.NewHandler(logger, client)
 	exitOnFailure(logger, err)
 	return http_server.NewUnixServer(atAddress, handler)

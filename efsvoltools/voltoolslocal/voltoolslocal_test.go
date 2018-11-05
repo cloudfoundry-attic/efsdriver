@@ -3,6 +3,8 @@ package voltoolslocal_test
 import (
 	"context"
 
+	"code.cloudfoundry.org/dockerdriver"
+	"code.cloudfoundry.org/dockerdriver/driverhttp"
 	"code.cloudfoundry.org/efsdriver/efsvoltools"
 	"code.cloudfoundry.org/efsdriver/efsvoltools/voltoolslocal"
 	"code.cloudfoundry.org/goshims/filepathshim/filepath_fake"
@@ -10,8 +12,6 @@ import (
 	"code.cloudfoundry.org/goshims/osshim/os_fake"
 	"code.cloudfoundry.org/lager"
 	"code.cloudfoundry.org/lager/lagertest"
-	"code.cloudfoundry.org/voldriver"
-	"code.cloudfoundry.org/voldriver/driverhttp"
 	"code.cloudfoundry.org/volumedriver/volumedriverfakes"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -20,7 +20,7 @@ import (
 var _ = Describe("Efs Driver", func() {
 	var logger lager.Logger
 	var ctx context.Context
-	var env voldriver.Env
+	var env dockerdriver.Env
 	var fakeOs *os_fake.FakeOs
 	var fakeFilepath *filepath_fake.FakeFilepath
 	var fakeIoutil *ioutil_fake.FakeIoutil
@@ -66,7 +66,7 @@ var _ = Describe("Efs Driver", func() {
 	})
 })
 
-func openPermsSuccessful(env voldriver.Env, tools efsvoltools.VolTools, fakeFilepath *filepath_fake.FakeFilepath, volumeName string, passcode string) {
+func openPermsSuccessful(env dockerdriver.Env, tools efsvoltools.VolTools, fakeFilepath *filepath_fake.FakeFilepath, volumeName string, passcode string) {
 	fakeFilepath.AbsReturns("/path/to/mount/", nil)
 	opts := map[string]interface{}{"ip": "1.1.1.1"}
 	response := tools.OpenPerms(env, efsvoltools.OpenPermsRequest{

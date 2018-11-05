@@ -1,7 +1,7 @@
 package efsvoltools
 
 import (
-	"code.cloudfoundry.org/voldriver"
+	"code.cloudfoundry.org/dockerdriver"
 	"github.com/tedsuo/rata"
 )
 
@@ -16,7 +16,7 @@ var Routes = rata.Routes{
 //go:generate counterfeiter -o ../efsdriverfakes/fake_vol_tool.go . VolTools
 
 type VolTools interface {
-	OpenPerms(env voldriver.Env, getRequest OpenPermsRequest) ErrorResponse
+	OpenPerms(env dockerdriver.Env, getRequest OpenPermsRequest) ErrorResponse
 }
 
 type OpenPermsRequest struct {

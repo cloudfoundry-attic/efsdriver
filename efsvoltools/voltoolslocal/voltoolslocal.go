@@ -9,19 +9,19 @@ import (
 
 	"syscall"
 
+	"code.cloudfoundry.org/dockerdriver"
+	"code.cloudfoundry.org/dockerdriver/driverhttp"
 	"code.cloudfoundry.org/efsdriver/efsvoltools"
 	"code.cloudfoundry.org/goshims/filepathshim"
 	"code.cloudfoundry.org/goshims/ioutilshim"
 	"code.cloudfoundry.org/goshims/osshim"
 	"code.cloudfoundry.org/lager"
-	"code.cloudfoundry.org/voldriver"
-	"code.cloudfoundry.org/voldriver/driverhttp"
 	"code.cloudfoundry.org/volumedriver"
 )
 
 type EfsVolumeInfo struct {
-	Ip                   string
-	voldriver.VolumeInfo // see voldriver.resources.go
+	Ip                      string
+	dockerdriver.VolumeInfo // see dockerdriver.resources.go
 }
 
 type EfsVolToolsLocal struct {
@@ -43,7 +43,7 @@ func NewEfsVolToolsLocal(os osshim.Os, filepath filepathshim.Filepath, ioutil io
 }
 
 // efsvoltools.VolTools methods
-func (d *EfsVolToolsLocal) OpenPerms(env voldriver.Env, request efsvoltools.OpenPermsRequest) efsvoltools.ErrorResponse {
+func (d *EfsVolToolsLocal) OpenPerms(env dockerdriver.Env, request efsvoltools.OpenPermsRequest) efsvoltools.ErrorResponse {
 	logger := env.Logger().Session("open-perms", lager.Data{"opts": request.Opts})
 	logger.Info("start")
 	defer logger.Info("end")
@@ -97,7 +97,7 @@ func (d *EfsVolToolsLocal) exists(path string) (bool, error) {
 	return true, err
 }
 
-func (d *EfsVolToolsLocal) mountPath(env voldriver.Env, volumeId string) string {
+func (d *EfsVolToolsLocal) mountPath(env dockerdriver.Env, volumeId string) string {
 	logger := env.Logger().Session("mount-path")
 	orig := syscall.Umask(000)
 	defer syscall.Umask(orig)
@@ -114,7 +114,7 @@ func (d *EfsVolToolsLocal) mountPath(env voldriver.Env, volumeId string) string 
 	return filepath.Join(dir, volumeId)
 }
 
-func (d *EfsVolToolsLocal) mount(env voldriver.Env, ip, mountPath string) error {
+func (d *EfsVolToolsLocal) mount(env dockerdriver.Env, ip, mountPath string) error {
 	logger := env.Logger().Session("mount", lager.Data{"ip": ip, "target": mountPath})
 	logger.Info("start")
 	defer logger.Info("end")
@@ -136,7 +136,7 @@ func (d *EfsVolToolsLocal) mount(env voldriver.Env, ip, mountPath string) error 
 	return err
 }
 
-func (d *EfsVolToolsLocal) unmount(env voldriver.Env, name string, mountPath string) error {
+func (d *EfsVolToolsLocal) unmount(env dockerdriver.Env, name string, mountPath string) error {
 	logger := env.Logger().Session("unmount")
 	logger.Info("start")
 	defer logger.Info("end")

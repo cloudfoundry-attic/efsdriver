@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"code.cloudfoundry.org/dockerdriver"
+	"code.cloudfoundry.org/dockerdriver/dockerdriverfakes"
+	"code.cloudfoundry.org/dockerdriver/driverhttp"
 	"code.cloudfoundry.org/efsdriver/efsmounter"
 	"code.cloudfoundry.org/lager"
 	"code.cloudfoundry.org/lager/lagertest"
-	"code.cloudfoundry.org/voldriver"
-	"code.cloudfoundry.org/voldriver/driverhttp"
-	"code.cloudfoundry.org/voldriver/voldriverfakes"
 	"code.cloudfoundry.org/volumedriver"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -20,10 +20,10 @@ var _ = Describe("EfsMounter", func() {
 	var (
 		logger      lager.Logger
 		testContext context.Context
-		env         voldriver.Env
+		env         dockerdriver.Env
 		err         error
 
-		fakeInvoker *voldriverfakes.FakeInvoker
+		fakeInvoker *dockerdriverfakes.FakeInvoker
 
 		subject volumedriver.Mounter
 
@@ -36,7 +36,7 @@ var _ = Describe("EfsMounter", func() {
 		env = driverhttp.NewHttpDriverEnv(logger, testContext)
 		opts = map[string]interface{}{}
 
-		fakeInvoker = &voldriverfakes.FakeInvoker{}
+		fakeInvoker = &dockerdriverfakes.FakeInvoker{}
 
 		subject = efsmounter.NewEfsMounter(fakeInvoker, "my-fs", "my-mount-options", "my-az")
 	})

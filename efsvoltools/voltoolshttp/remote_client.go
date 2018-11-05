@@ -18,10 +18,10 @@ import (
 
 	os_http "net/http"
 
+	"code.cloudfoundry.org/dockerdriver"
+	"code.cloudfoundry.org/dockerdriver/driverhttp"
 	"code.cloudfoundry.org/efsdriver/efsvoltools"
 	"code.cloudfoundry.org/goshims/http_wrap"
-	"code.cloudfoundry.org/voldriver"
-	"code.cloudfoundry.org/voldriver/driverhttp"
 )
 
 type reqFactory struct {
@@ -66,7 +66,7 @@ func NewRemoteClientWithClient(socketPath string, client http_wrap.Client, clock
 	}
 }
 
-func (r *remoteClient) OpenPerms(env voldriver.Env, request efsvoltools.OpenPermsRequest) efsvoltools.ErrorResponse {
+func (r *remoteClient) OpenPerms(env dockerdriver.Env, request efsvoltools.OpenPermsRequest) efsvoltools.ErrorResponse {
 	logger := env.Logger().Session("open-perms", lager.Data{"request": request})
 	logger.Info("start")
 	defer logger.Info("end")
@@ -112,7 +112,7 @@ func (r *remoteClient) clientError(logger lager.Logger, err error, msg string) s
 	return err.Error()
 }
 
-func (r *remoteClient) do(env voldriver.Env, requestFactory *reqFactory) (*os_http.Response, error) {
+func (r *remoteClient) do(env dockerdriver.Env, requestFactory *reqFactory) (*os_http.Response, error) {
 	var (
 		response *os_http.Response
 		err      error

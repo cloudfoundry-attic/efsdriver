@@ -10,13 +10,13 @@ import (
 
 	"context"
 
+	"code.cloudfoundry.org/dockerdriver"
+	"code.cloudfoundry.org/dockerdriver/driverhttp"
 	"code.cloudfoundry.org/efsdriver/efsvoltools"
 	"code.cloudfoundry.org/efsdriver/efsvoltools/voltoolshttp"
 	"code.cloudfoundry.org/goshims/http_wrap/http_fake"
 	"code.cloudfoundry.org/lager"
 	"code.cloudfoundry.org/lager/lagertest"
-	"code.cloudfoundry.org/voldriver"
-	"code.cloudfoundry.org/voldriver/driverhttp"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -26,7 +26,7 @@ var _ = Describe("RemoteClient", func() {
 	var (
 		testLogger          lager.Logger
 		testCtx             context.Context
-		testEnv             voldriver.Env
+		testEnv             dockerdriver.Env
 		httpClient          *http_fake.FakeClient
 		voltools            efsvoltools.VolTools
 		invalidHttpResponse *http.Response
