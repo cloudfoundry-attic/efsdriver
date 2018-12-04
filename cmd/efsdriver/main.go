@@ -32,7 +32,7 @@ import (
 
 var atAddress = flag.String(
 	"listenAddr",
-	"0.0.0.0:9750",
+	"127.0.0.1:9750",
 	"host:port to serve volume management functions",
 )
 

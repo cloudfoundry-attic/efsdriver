@@ -46,7 +46,7 @@ var _ = Describe("Main", func() {
 
 		It("listens on tcp/9750 by default", func() {
 			EventuallyWithOffset(1, func() error {
-				_, err := net.Dial("tcp", "0.0.0.0:9750")
+				_, err := net.Dial("tcp", "127.0.0.1:9750")
 				return err
 			}, 5).ShouldNot(HaveOccurred())
 
@@ -56,7 +56,7 @@ var _ = Describe("Main", func() {
 
 			Expect(string(specFileContents)).To(MatchJSON(`{
 				"Name": "efsdriver",
-				"Addr": "http://0.0.0.0:9750",
+				"Addr": "http://127.0.0.1:9750",
 				"TLSConfig": null,
 				"UniqueVolumeIds": false
 			}`))
@@ -79,7 +79,7 @@ var _ = Describe("Main", func() {
 
 				Expect(string(specFileContents)).To(MatchJSON(`{
 					"Name": "efsdriver",
-					"Addr": "http://0.0.0.0:9750",
+					"Addr": "http://127.0.0.1:9750",
 					"TLSConfig": null,
 					"UniqueVolumeIds": true
 				}`))
