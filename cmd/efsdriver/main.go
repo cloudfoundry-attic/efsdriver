@@ -155,12 +155,12 @@ func main() {
 	}
 
 	servers := grouper.Members{
-		{"localdriver-server", localDriverServer},
+		{Name: "localdriver-server", Runner: localDriverServer},
 	}
 
 	if dbgAddr := cf_debug_server.DebugAddress(flag.CommandLine); dbgAddr != "" {
 		servers = append(grouper.Members{
-			{"debug-server", cf_debug_server.Runner(dbgAddr, logTap)},
+			{Name: "debug-server", Runner: cf_debug_server.Runner(dbgAddr, logTap)},
 		}, servers...)
 	}
 
@@ -231,7 +231,7 @@ func createEfsDriverServer(logger lager.Logger, client dockerdriver.Driver, efsv
 		efsToolsHandler, err := voltoolshttp.NewHandler(logger, efsvoltools)
 		exitOnFailure(logger, err)
 		efsServer := http_server.New(efsToolsAddress, efsToolsHandler)
-		server = grouper.NewParallel(os.Interrupt, grouper.Members{{"dockerdriver", server}, {"efstools", efsServer}})
+		server = grouper.NewParallel(os.Interrupt, grouper.Members{{Name: "dockerdriver", Runner: server}, {Name: "efstools", Runner: efsServer}})
 	}
 
 	return server

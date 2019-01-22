@@ -47,7 +47,8 @@ func (m *efsMounter) Unmount(env dockerdriver.Env, target string) error {
 }
 
 func (m *efsMounter) Check(env dockerdriver.Env, name, mountPoint string) bool {
-	ctx, _ := context.WithDeadline(context.TODO(), time.Now().Add(time.Second*5))
+	ctx, cncl := context.WithDeadline(context.TODO(), time.Now().Add(time.Second*5))
+	defer cncl()
 	env = driverhttp.EnvWithContext(ctx, env)
 	_, err := m.invoker.Invoke(env, "mountpoint", []string{"-q", mountPoint})
 
