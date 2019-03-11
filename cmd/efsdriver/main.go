@@ -114,7 +114,7 @@ var uniqueVolumeIds = flag.Bool(
 )
 
 const fsType = "nfs4"
-const mountOptions = "vers=4.0,rsize=1048576,wsize=1048576,hard,intr,timeo=600,retrans=2,actimeo=0"
+const mountOptions = "vers=4.0,rsize=1048576,wsize=1048576,timeo=600,retrans=2,actimeo=0"
 
 func main() {
 	parseCommandLine()
