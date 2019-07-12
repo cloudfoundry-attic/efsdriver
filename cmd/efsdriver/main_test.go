@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -50,16 +51,22 @@ var _ = Describe("Main", func() {
 				return err
 			}, 5).ShouldNot(HaveOccurred())
 
-			specFile := filepath.Join(dir, "efsdriver.json")
-			specFileContents, err := ioutil.ReadFile(specFile)
-			Expect(err).NotTo(HaveOccurred())
+			Eventually(func() string {
+				specFile := filepath.Join(dir, "efsdriver.json")
+				_, err := os.Stat(specFile)
+				if err != nil {
+					return ""
+				}
 
-			Expect(string(specFileContents)).To(MatchJSON(`{
-				"Name": "efsdriver",
-				"Addr": "http://127.0.0.1:9750",
-				"TLSConfig": null,
-				"UniqueVolumeIds": false
-			}`))
+				specFileContents, err := ioutil.ReadFile(specFile)
+				Expect(err).NotTo(HaveOccurred())
+				return string(specFileContents)
+			}, 1 * time.Minute, 5 * time.Millisecond).Should(MatchJSON(`{
+					"Name": "efsdriver",
+					"Addr": "http://127.0.0.1:9750",
+					"TLSConfig": null,
+					"UniqueVolumeIds": false
+				}`))
 		})
 
 		Context("with unique volume IDs enabled", func() {
@@ -69,20 +76,22 @@ var _ = Describe("Main", func() {
 
 			It("sets the uniqueVolumeIds flag in the spec file", func() {
 				specFile := filepath.Join(dir, "efsdriver.json")
-				Eventually(func() error {
+				Eventually(func() string {
 					_, err := os.Stat(specFile)
-					return err
-				}, 5).ShouldNot(HaveOccurred())
+					if err != nil {
+						return ""
+					}
 
-				specFileContents, err := ioutil.ReadFile(specFile)
-				Expect(err).NotTo(HaveOccurred())
-
-				Expect(string(specFileContents)).To(MatchJSON(`{
+					specFileContents, err := ioutil.ReadFile(specFile)
+					Expect(err).NotTo(HaveOccurred())
+					return string(specFileContents)
+				}, 1 * time.Minute, 5 * time.Millisecond).Should(MatchJSON(`{
 					"Name": "efsdriver",
 					"Addr": "http://127.0.0.1:9750",
 					"TLSConfig": null,
 					"UniqueVolumeIds": true
 				}`))
+
 			})
 		})
 	})
